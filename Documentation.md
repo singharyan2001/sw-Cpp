@@ -121,4 +121,27 @@ Notes:
 #### `<<` in C++
 - In raw C, `<<` is strictly a bitwise left-shift operator used for register manipulation.
 - C++ introduces `operator overloading` which allows you to redefine what standard symbols do.
+- The iostream library overloads << to act as an "insertion" operator.
+- When you write `std::cout << "Data"`, you aren't doing bit math. You are taking the "Data" and pushing it into the cout stream object. It is conceptually identical to calling a method on an object in Python, like `dock.enclosure("Data")`. You are just using an operator symbol instead of a standard function call to pass that data into the object.
+
+#### C++ Compilation Workflow
+The C++ build process happens in three distinct, isolated phases:
+1. **Preprocessing:** Resolves all `#` directives (copy-pasting text).
+2. **Compilation:** The compiler translates each individual `.cpp` file into an intermediate machine-code file called an Object file (`.o` or `.obj`). It does this blindly, file by file, without knowing about the rest of your project.
+3. **Linking:** The linker takes all those standalone Object files and stitches them together into the final executable binary.
+
+##### Debug vs Release & Solution Configurations
+These are build rules that tell the compiler how to generate your machine code.
+1. **Debug:** The compiler leaves the code mostly unoptimized and injects "debug symbols" (markers that map the machine code back to your exact lines of C++). It runs slower, but allows you to step through the code line-by-line.
+2. **Release:** The compiler aggressively optimizes the code for maximum speed and minimum footprint, stripping out all debug symbols.
+3. **x86 vs x64 (Architecture):** This specifies the target CPU instruction set. x86 is for 32-bit processors, and x64 is for 64-bit processors. If you were cross-compiling this C++ code for your RPi5 later, you would switch this target configuration to ARM64.
+
+#### Declarations and Definitions
+1. **Declaration:** You are making a promise to the compiler. `void initDock();` tells the compiler, "A function with this name and return type exists somewhere. Trust me." (This goes in the Header).
+2. **Definition:** You are fulfilling the promise. `void initDock() { /* setup code */ }` is the actual memory and logic allocated to that function. (This goes in the Source file).
+
+#### Linker in C++
+- Because the compiler works on each `.cpp` file in complete isolation, it relies entirely on Declarations to compile successfully.
+- The Linker is the final glue. It searches through all the generated `.o` files to match the Declarations with their actual Definitions.
+- If you promised the compiler that `initDock()` existed, but you forgot to write the definition in your `.cpp` file (or forgot to tell CMake to compile that specific file), the compiler will pass, but the Linker will fail and throw an "unresolved external symbol" error.
 
