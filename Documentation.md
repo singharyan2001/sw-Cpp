@@ -307,8 +307,26 @@ Therefore:
 - Discussed double pointers with an example.
 
 ## References in C++
+- Explained the use `<data-type>*` and `<data-type>&` for pointer declaration and reference declarations.
+- Discussed that reference is just an alias, it just exists in the source code and it does not exists in or consume memory when we compare with pointers.
+    - Conceptually yes, it is just an alias.
+    - If you write `int&b = a;` inside a single function, the compiler usually optimizes it away completely using zero memory.
+    - The Exception is when you pass a reference into a function (for e.g. `void process_data(int& data)`), the compiler cannot magically alias accross different stack frames.
+    - Under the hood, the compiler implements references as standard pointers, it passes the memory address over the stack exactly like a pointer would, meaning it takes the same bytes of overhead as a pointer.
+    - The Benefit is purely syntactic sugar and safet for the programmer.
+- Discussed how passing by value, pointer, and reference work with functions.
+    ![Call by Value](doc-imgs/Cpp_pass_by_value.png)
+    - In Call by Value, a function receives a complete copy of the variable and changes to the parameter inside the function does not affect the original variable in the caller's stack frame.
 
+    ![Call by Pointers](doc-imgs/Cpp_pass_by_pointer.png)
+    - In Pass by Pointer, the fucntion receives the memory address (0x2000) of the variable, and the function uses the pointer to reach back and modify the original memory directly.
 
+    ![Call by References](doc-imgs/Cpp_pass_by_reference.png)
+    - In Pass by Reference, the function parameter becomes an alias for the original variable, and it shares the same memory address, and behaves like a pointer but with cleaner, 'value like' syntax.
+
+- Discussed how the reference can tied to a variable1, cannot make the same reference point to a new variable called variable2.
+    - A pointer can point to something else later, but a reference is locked to its target for life.
+- Discussed how pointers and reference can be used together.
 
 ## Pointers, Arrays, and References in C++ (Reference Book - Ch1:1.8)
 
