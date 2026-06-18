@@ -329,4 +329,18 @@ Therefore:
 - Discussed how pointers and reference can be used together.
 
 ## Pointers, Arrays, and References in C++ (Reference Book - Ch1:1.8)
+- In Declarations, `[]` means "array of" and `*` means "pointer to".
+- All arrays have 0 as their lower bound, so for example char v[6] is from v[0] to v[5].
+- The size of an array x[number] must be a constant expression.
+- In an Expression, prefix unary `*` means "contents of" and prefix unary `&` means "address of".
+- In a Declaration, the unary suffix `&` means "reference to".
+- A Reference is similar to a pointer, except that you dont need to use a prefix `*` to access the value referred to by he reference.
+- Also, a reference cannot be made to refer to a different object after its initialization.
+- References are particular useful for specifying function arguments, for example `void sort(vector<double>& v);`. Therefore by using a reference, we ensure that for a call `sort(my_vec)`, we do not copy `my_vec` and that it is relay `my_vec` that is sorted ad not a copy of it.
+- When we don't want to modify an argument, but still don't want the cost of copying, we use a const reference, for e.g. `double sum(const vector<double>&)`
+
+Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
+
+---
+
 
