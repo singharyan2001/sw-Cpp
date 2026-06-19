@@ -6,7 +6,7 @@
 
 /* ============= RING BUFFER FUNCTION DECLARATIONS ============= */
 
-rbuf_status_t rbuf_init(rbuf_handle_t& rbuf, int* buf, int& buffer_length){
+rbuf_status rbuf_init(rbuf_handle& rbuf, int* buf, int& buffer_length){
     // Intialize referenced rung buffer structure
     rbuf.rbuf_addr = buf;
     rbuf.rbuf_max_length = buffer_length;
@@ -17,7 +17,7 @@ rbuf_status_t rbuf_init(rbuf_handle_t& rbuf, int* buf, int& buffer_length){
     return RBUF_OK;
 }
 
-rbuf_status_t rbuf_push(rbuf_handle_t& rbuf, int value){
+rbuf_status rbuf_push(rbuf_handle& rbuf, int value){
     // Check for Full Condition
     if(rbuf.bytes_written == rbuf.rbuf_max_length){
         rbuf.rbuf_overflow = true;
@@ -31,9 +31,10 @@ rbuf_status_t rbuf_push(rbuf_handle_t& rbuf, int value){
     return RBUF_OK;
 }
 
-rbuf_status_t rbuf_pop(rbuf_handle_t& rbuf, int& out_value){
+rbuf_status rbuf_pop(rbuf_handle& rbuf, int& out_value){
     // Check for Empty Condition
     if(rbuf.head_index == rbuf.tail_index){
+        rbuf.rbuf_overflow = false;
         return RBUF_EMPTY;
     }
     // Perform pop operation on the buffer
@@ -43,7 +44,7 @@ rbuf_status_t rbuf_pop(rbuf_handle_t& rbuf, int& out_value){
     return RBUF_OK;
 }
 
-void rbuf_print_status(const rbuf_handle_t& rbuf){
+void rbuf_print_status(const rbuf_handle& rbuf){
     log_msg("============= RING BUFFER INFO [START] =============");
     log_data("RING BUFFER ADDRESS: ", rbuf.rbuf_addr);
     log_data("RING BUFFER SIZE: ", rbuf.rbuf_max_length);

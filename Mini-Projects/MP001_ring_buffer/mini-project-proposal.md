@@ -83,4 +83,4 @@ Note: This was not an issue wrt compilation and execution, but C Style habit was
 ### Mistakes done in the mini-project
 1. Forgot to use the modulo operation during push and pop operations, immediately integrated and tested.
 2. Using namespace std in a header file -> should not be used as it will create problems in the global space >> in `log.h`, directly use `std::cout`.
-3. 
+3. Fixed a bug wrt buffer addres print output.
