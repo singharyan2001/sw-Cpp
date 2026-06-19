@@ -40,10 +40,10 @@ Write a sequence in `main()` that proves your logic works:
 
 ## Project Design
 
-### Ring Buffer Structure Design
+### RingBuffer Handle Design
 The Ring buffer structure would need to keep track of information of the buffer and its mechanisms i.e. buffer address, max buffer length, buffer status, head index or write pointer, tail or erad pointer, byte_count or bytes_written, and buffer overflow flag.
 
-The RIng buffer would also require an enum for return functions to understand whether the buffer operation was OK, IN-ERROR, OVERFLOW, FULL, and EMPTY.
+The Ring buffer would also require an enum for return functions to understand whether the buffer operation was OK, IN-ERROR, OVERFLOW, FULL, and EMPTY.
 
 ```cpp
 // Ring Buffer Enums
@@ -59,7 +59,6 @@ typedef enum{
 typedef struct{
     uint8_t* rbuf_addr;
     uint8_t rbuf_max_length;
-    rb_status_e rbuf_status;
     uint8_t head_index;
     uint8_t tail_index;
     uint8_t bytes_written,
@@ -67,3 +66,21 @@ typedef struct{
 } rbuf_handle_t;
 ```
 
+### Ring Buffer Design Consideration
+1. EMPTY Condition
+2. FULL Condition
+3. Role of Modulus Operator
+
+---
+
+## Mistakes done in mini-project implementation
+
+### C Style Implementation Habit in C++
+Note: This was not an issue wrt compilation and execution, but C Style habit was implemented for enums an structures, just implemente using C++ style
+1. using typedef for enum and structure - which is not required in c++ as 
+2. Used #define to creatq quick printf functions which is C Style, in Mordern C++ >> macros are heavily discouraged because they bypass the compiler's type-checking and make debugging difficult, move from `macros` to `inline functions` as they give exact same performance as a macro but are completely type-safe and respect namespaces.
+
+### Mistakes done in the mini-project
+1. Forgot to use the modulo operation during push and pop operations, immediately integrated and tested.
+2. Using namespace std in a header file -> should not be used as it will create problems in the global space >> in `log.h`, directly use `std::cout`.
+3. 
