@@ -343,4 +343,7 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
 
 ---
 
+## Classes in C++
+- Classes group data and functionality together.
+- Discussed on classes, visibility of data in a class, methods (functionality) in classes.
 
