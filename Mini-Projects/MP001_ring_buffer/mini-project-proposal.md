@@ -67,9 +67,9 @@ typedef struct{
 ```
 
 ### Ring Buffer Design Consideration
-1. EMPTY Condition
-2. FULL Condition
-3. Role of Modulus Operator
+1. EMPTY Condition >> This Condition can be detected by the relation between head index and tail index. When `head index == tail index`, we can consider the ring buffer to be empty.
+2. FULL Condition >> This Condition can be detected by keeping a counter to see how many bytes are written i.e. whenever bytes are pushed to the buffer, the count value can be incremented by 1 and whenever bytes are read from the ring buffer, the count can be decremented by 1. Therefore the buffer is full when `bytes_written_count == max_buffer_length`.
+3. Role of Modulus Operator >> The Modulus operator can be used to get the remainder of the operation, e.g. head index is 9, tail index is 0, and max length is 10, so we can consider there are 10 (0-9) bytes in the buffer, so we can do `(head + 1) % buffer size` i.e. (10+1) % 10 = 10/10 -> 0 remainder i.e. the index would wrap around from 9 to 0. Therefore achieving the wrap around mechanism.
 
 ---
 

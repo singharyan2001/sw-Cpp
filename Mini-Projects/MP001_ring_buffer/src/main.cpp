@@ -9,7 +9,6 @@ int rbuffer[max_buffer_size] = {0};
 
 rbuf_handle rb_handle = {0};
 
-
 int main(){
     log_msg("============= MINI-PROJECT 001: RING BUFFER =============");
     
