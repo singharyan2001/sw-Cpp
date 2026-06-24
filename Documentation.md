@@ -380,13 +380,41 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
 - Discussed static and extern keywords and usage
 - Discussed using static on global variables and with functions
 - The Cherno explains the difference between using the static keyword inside and outside of classes. The discussion focuses on how static influences symbol linkage across translation units, affecting variable and function visibility.
+- Discussed how static is used in classes wrt attributes and methods.
+- Discussed why we need to intialize the static variables inside a class or struct.
+- Discussed about static methods.
+- Discussed how we can just access static attributes and methids via namespace and why this is how they should be accessed.
+- Discussed why static methods cannot access non static attributes of a class, and this can be solved by passing on the class via arguments of that static method of he class.
+- The Cherno demonstrates how static variables and methods function within classes and structs, focusing on memory sharing across instances. Examples highlight the distinction between static and non-static members and their behavior during compilation.
+
 
 ### Personal notes on static
-1. In C++, the word `static` is overloaded. It dictates two completelt different behaviors depeding entirely on where you type it - Linkage (Visibility) VS Lifetime (Storage)
-2. Context 1: Outside a class (file scope/Global level)
+1. In C++, the word `static` is overloaded. It dictates two completely different behaviors depeding entirely on where you type it - Linkage (Visibility) VS Lifetime (Storage)
+2. **Context 1:** Outside a class (file scope/Global level)
     1. Internal Linkage basically imples that this symbol is invisible outside this specific `.cpp` file.
     2. By default, any global variable or standalone function we write has External Linkage. When the compiler turns `sensor.cpp` into `sensor.o`, it puts that variable's name into a public "Symbol Table" so the linker can let other `.cpp` files connect to it via `extern`.
-    3. Adding `static` acts as a Linker Cloak - It changes the linkage from external to internal, and the compiler still puts the variable in RAM, but it refuses to write its name into the public symbol table.
+    3. Adding `static` acts as a Linker Cloak:
+        1. Static changes the linkage from external to internal
+        2. The compiler still puts the variable in RAM, but it refuses to write its name into the public symbol table.
+        ```cpp
+        // 3. Example >> inside driver_a.cpp
+        int global_speed = 100; // Publuc to the whole project
+        static int private_offset = 12; // Strictly trapped inside driver_a.cpp file
+        ```
 
-## Static for classes and structs in C++
+    4. Static prevents Namespace pollution, for e.g. if `i2c_driver.cpp` and `spi_driver.cpp` both need a local tracking variable named `static bool is_busy`, marking them both statuc guarantees the linker won't crash with a `Multiple Definition`error, since they exisit as two totally isolated addresses in RAM.
+3. **Context 3:** Inside a Local Function (Function Scope)
+    1. In C++, using static inside a local function implies "Persistent Lifetime" i.e. intialize me once, remember my value forever.
+    2. When you put `static` on a variable inside a function, it does not live on the stack; it lives in the global data segment.
+    3. The line of code that intializes it is only executed the  very first time the CPU calls that function.
+    ```cpp
+    void triggerheartbeat(){
+        static uint32_t last-toggle_time = 0; // Evaluated ONCE at boot
+        if(millis() - last_toggle_time >= 1000){
+            toggleLed();
+            last_toggle_time = millis(); //Remembers this value for the next call!!
+        }
+    }
+    ```
 
+## Enums in C++
