@@ -93,6 +93,9 @@ To learn this effectively without hitting a wall, synchronize them by topic rath
 
 ## Cpp YT Playlist - The Cherno
 
+Playlist Link >> https://www.youtube.com/playlist?list=PLlrATfBNZ98dudnM48yfGUldqGD0S4FFb
+
+
 ### How C++ Works
 
 ```text
@@ -345,5 +348,45 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
 
 ## Classes in C++
 - Classes group data and functionality together.
+- Dicussed on Object and Instances in Classes.
 - Discussed on classes, visibility of data in a class, methods (functionality) in classes.
+
+## Classes VS Structs in C++
+- Discussed difference between structs and Class & also on the visibility property.
+- Discussed why structs exist in C++ when classes already exists - due to backwards compatibiltiy.
+- Discussed application for structs and Classes in C++
+- Discussed struct application - to use to represent a structure of data
+- Discussed classes applucation - to not only represent data, but for it to also have functionality, visibility, and inheritence concepts applied, would go for classes.
+- Note: Structs can also have functions defined in them with data attributes in C++, for e.g.
+    ```Cpp
+    struct example{
+        float x,y;
+        void move(example &ex){
+            x += ex.x;
+            y += ex.y;
+        }
+    }
+    ```
+
+## How to Write a C++ Class
+- Discussed Log Class implementation that would contain 3 levels i.e. error, warning, message/trace and set our log systems level to only print to console depending on the level.
+- Discussed and implemented the logging class - public variables, public static variables, public methods, private variables and private function implemented.
+- Hands on implmentation done on log class implementation
+
+## Static in C++
+- Discussed how static has two meanings wrt context
+    - static keyword usage outside classes / structs (global level)
+    - static keyword usage inside classes / structs (internally in classes/structs)
+- Discussed static and extern keywords and usage
+- Discussed using static on global variables and with functions
+- The Cherno explains the difference between using the static keyword inside and outside of classes. The discussion focuses on how static influences symbol linkage across translation units, affecting variable and function visibility.
+
+### Personal notes on static
+1. In C++, the word `static` is overloaded. It dictates two completelt different behaviors depeding entirely on where you type it - Linkage (Visibility) VS Lifetime (Storage)
+2. Context 1: Outside a class (file scope/Global level)
+    1. Internal Linkage basically imples that this symbol is invisible outside this specific `.cpp` file.
+    2. By default, any global variable or standalone function we write has External Linkage. When the compiler turns `sensor.cpp` into `sensor.o`, it puts that variable's name into a public "Symbol Table" so the linker can let other `.cpp` files connect to it via `extern`.
+    3. Adding `static` acts as a Linker Cloak - It changes the linkage from external to internal, and the compiler still puts the variable in RAM, but it refuses to write its name into the public symbol table.
+
+## Static for classes and structs in C++
 
