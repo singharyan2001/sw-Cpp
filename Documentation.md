@@ -351,6 +351,12 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
 - Dicussed on Object and Instances in Classes.
 - Discussed on classes, visibility of data in a class, methods (functionality) in classes.
 
+### Notes (reference textbook ch2)
+1. A Class is defined to have a set of members, and private members are accessible only through that interface.
+2. A function with the same name as its class is called a constructor i.e. a function used to construct objects of a class.
+3. There is no fundamental difference between a struct and a class; a struct is simply a class with members public by default.
+
+
 ## Classes VS Structs in C++
 - Discussed difference between structs and Class & also on the visibility property.
 - Discussed why structs exist in C++ when classes already exists - due to backwards compatibiltiy.
@@ -385,6 +391,8 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
 - Discussed about static methods.
 - Discussed how we can just access static attributes and methids via namespace and why this is how they should be accessed.
 - Discussed why static methods cannot access non static attributes of a class, and this can be solved by passing on the class via arguments of that static method of he class.
+- Discussed the differences between static and non-static attributes and methods
+- Discussed how a c++ class actually works (internals)
 - The Cherno demonstrates how static variables and methods function within classes and structs, focusing on memory sharing across instances. Examples highlight the distinction between static and non-static members and their behavior during compilation.
 
 
@@ -417,4 +425,87 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
     }
     ```
 
+## Unions in C++
+
+### Notes (reference textbook ch2)
+1. A union is a struct in which all members are allocated at the same address so that the union occupies only as much space as its largest member.
+2. Naturally, a union can hold a value for only one member at a time.
+3. The language doesn’t keep track of which kind of value is held by a union, so the programmer must do that.
+
 ## Enums in C++
+- Discussed Enum which are a set of values which the user gives a name to for readability.
+- Enum is basically an integer
+- You can specify the type of integer you want the enum to be such as `enum Example :: unsigned char`
+- By default, enum’s are 32-bit integers
+- integrating enum to log class example
+- using log::<enum> as a log namespace in main code to access enum
+- will later focus on enum classes in C++
+- **Video Summary:** The Cherno demonstrates how to use enumerations to name integer values, improving code readability and grouping related constants. Learn to define custom types to restrict valid inputs and keep code cleaner.
+
+### Notes (reference textbook ch2)
+1. In C++, there are two ways to work with enummeration i.e. enum and enum class.
+    1. **Enum** >> basically an unscoed enum, which leaks its values into the surrounding scope and allows implicit conversions to integers
+    2. **Enum Class** >> basically a scoped enum whcih restricts its values to its own scope and strictly prevents implicit integer conversion.
+2. In addition to classes, C++ supports a simple form of user-deﬁned type for which we can enumerate the values.
+    ```cpp
+    enum class Color { red, blue, green };
+    enum class Trafﬁc_light{ green, yellow, red };
+
+    Color col = Color::red;
+    Trafﬁc_light light = Trafﬁc_light::red;
+    ```
+3. Enumerations are used to represent small sets of integer values. They are used to make code
+more readable and less error-prone than it would have been had the symbolic (and mnemonic) enumerator names not been used.
+4. The class after the enum speciﬁes that an enumeration is strongly typed and that its enumerators are scoped.
+5. Class & Enums, Being separate types, enum classes help prevent accidental misuses of constants.
+6. In particular, we cannot mix Trafﬁc_light and Color values:
+    ```cpp
+    Color x = red;                  // error : which red?
+    Color y = Trafﬁc_light::red;    // error : that red is not a Color
+    Color z = Color::red;           // OK
+    ```
+7. Similarly, we cannot implicitly mix Color and integer values:
+    ```cpp
+    int i = Color::red;     // error : Color ::red is not an int
+    Color c = 2;            // error : 2 is not a Color
+    ```
+8. The enumerators from a "plain" enum are entered into the same scope as the name of their enum and implicitly converts to their integer value. for e.g.
+    ```cpp
+    enum Color { red, green, blue };
+    int col = green;
+    ```
+9. The "plain" enums have been in C++ (and C) from the earliest days, so even though they are less well behaved, they are common in current code.
+
+Note: Chapter 2 of reference text book "A Tour of C++" is now completed, moving to chapter 3.
+---
+
+## Constructors in C++
+- Constructor is a special type of method in classes, which runs whenever instantiated an object.
+- You can create a constructor by creating a function with the class name, for e.g. `class entity` → `entity(){ }` and if needed you can also pass arguments like `entity(int a, int b){ }` .
+- We can hide the constructor if not needed like a static class by including the entity under private section of the class.
+- If the user does not want the inbuilt constructor of a class, so that the object is not instantiated by just writing this piece of code >> `classname() = delete;`
+- **Video Summary:** The Cherno demonstrates how to properly initialize class member variables using special methods called upon object instantiation. The tutorial covers creating default and parameterized constructors to replace manual initialization methods.
+
+## Destructors in C++
+- Destructors run when you destroy an object
+- You can create a destructor in a similar way like its done for a constructor, but just add a tilde (~) as a prefix, for e.g. `~entity(){ }`
+- Implemented the entire constructor to destructor cycle of an object by creating an object in a function to show the constructor and destructor outputs via print.
+- **Video Summary:** The Cherno demonstrates how to implement destructors to manage memory cleanup when objects go out of scope or are deleted. Examples include using breakpoints in Visual Studio to trace when the destructor is called on stack-allocated objects.
+
+## Inheritance in C++
+- Discusses on Inheritance in C++ and how it helps programmers avoid duplication.
+- Implemented an example of inheritance, where a base class called `entity` and sub-class `player` was created and new functionality was added in the player class.
+- Discussed on the visibility concept wrt base class and sub-classes.
+- Discussed an introductary overview on polymorphism and how it can be used between base class and sub-classes.
+- Discussed how a prograamer can create a function that takes in the entity type as its input arguments, and that function is capable of taking the player sub-class via that arguments, because the player class is a subset of the base class entity, therefore it is type player and entity, therefore it is completely valid.
+    - Book Definition: A subclass object (Player) is an instance of both itself and its base class (Entity). Because it satisfies an "is-a" relationship (Player is-an Entity), any function expecting a parameter of type Entity will seamlessly accept a Player argument.
+- **Video Summary:** The Cherno explores how inheritance allows for a hierarchy of classes, using a base class to share common functionality like position and movement methods with derived subclasses. This approach significantly reduces code duplication while introducing new data members and specialized functionality to specific entities.
+
+## Virtual Functions in C++
+- Virtual functions allow us to override methods in sub-classes.
+
+## Interfaces in C++
+
+## Visibility in C++
+
+
