@@ -476,7 +476,10 @@ more readable and less error-prone than it would have been had the symbolic (and
     ```
 9. The "plain" enums have been in C++ (and C) from the earliest days, so even though they are less well behaved, they are common in current code.
 
-Note: Chapter 2 of reference text book "A Tour of C++" is now completed, moving to chapter 3.
+**Notes:**
+1. Chapter 2 of reference text book "A Tour of C++" is now completed, moving to chapter 3.
+2. Chapter 2 contents - structs, class, unions, and enums covered.
+
 ---
 
 ## Constructors in C++
