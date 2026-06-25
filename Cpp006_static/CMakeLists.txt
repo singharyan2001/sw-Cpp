@@ -2,10 +2,10 @@
 file(GLOB SOURCES "src/*.cpp")
 
 # 2. Define the executable using those source files
-add_executable(Cpp004_references ${SOURCES})
+add_executable(Cpp006_static ${SOURCES})
 
 # 3. Tell the compiler where your header files (.h / .hpp) live
-target_include_directories(Cpp004_references PRIVATE inc)
+target_include_directories(Cpp006_static PRIVATE inc)
 
-# 4. Route the executable back to the HelloWorld folder
-set_target_properties(Cpp004_references PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+# 4. Route the executable back to the folder
+set_target_properties(Cpp006_static PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
