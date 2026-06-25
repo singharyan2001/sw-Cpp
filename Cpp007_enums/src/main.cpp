@@ -27,34 +27,51 @@ enum class TrafficLights{
 
 // Creating Enums in Class
 class log{
-    public:
-        enum class Log_Level{
-            LEVEL_ERROR,
-            LEVEL_WARNING,
-            LEVEL_INFO
-        };
-    private:
-        Log_Level _log_level = Log_Level::LEVEL_INFO;
+public:
+    enum class Log_Level{
+        LEVEL_ERROR,
+        LEVEL_WARNING,
+        LEVEL_INFO
+    };
+private:
+    Log_Level _log_level;
+
+public:
+    // Default Constructor
+    log(){
+        _log_level = Log_Level::LEVEL_INFO;
+        std::cout << "LOG INSTANCE CREATION SUCCESS - WITH LOG LEVEL: " << (int)_log_level << std::endl;
+    }
     
-    public:
-        void set_log_level(Log_Level level){
-            _log_level = level;
-        }
-        
-        void error(const char* message){
-            if(_log_level >= Log_Level::LEVEL_ERROR)
-                std::cout << "[ERROR]" << " " << message << std::endl;
-        }
+    // Default Destructor
+    ~log(){
+        std::cout << "LOG INSTANCE WILL BE DESTROYED DUE TO DESTRUCTOR BEING TRIGGERED" << std::endl;
+    }
+    
+    // Constructor with Input Arguments
+    log(Log_Level level){
+        _log_level = level;
+        std::cout << "LOG INSTANCE CREATION SUCCESS - WITH LOG LEVEL: " << (int)_log_level << std::endl;
+    }
 
-        void warning(const char* message){
-            if(_log_level >= Log_Level::LEVEL_WARNING)
-            std::cout << "[WARNING]" << " " << message << std::endl;
-        }
+    void set_log_level(Log_Level level){
+        _log_level = level;
+    }
+    
+    void error(const char* message){
+        if(_log_level >= Log_Level::LEVEL_ERROR)
+            std::cout << "[ERROR]" << " " << message << std::endl;
+    }
 
-        void info(const char* message){
-            if(_log_level >= Log_Level::LEVEL_INFO)
-            std::cout << "[INFO]" << " " << message << std::endl;
-        }
+    void warning(const char* message){
+        if(_log_level >= Log_Level::LEVEL_WARNING)
+        std::cout << "[WARNING]" << " " << message << std::endl;
+    }
+
+    void info(const char* message){
+        if(_log_level >= Log_Level::LEVEL_INFO)
+        std::cout << "[INFO]" << " " << message << std::endl;
+    }
 };
 
 
@@ -75,8 +92,9 @@ int main(){
     log_msg("===================================================");
 
     log_msg("=========== USING ENUMS IN CLASS ===================");
-    log logger;
-    logger.set_log_level(log::Log_Level::LEVEL_INFO);
+    // log logger;
+    log logger(log::Log_Level::LEVEL_WARNING);
+    // logger.set_log_level(log::Log_Level::LEVEL_INFO);
     logger.info("HELLO FROM INFO LEVEL");
     logger.warning("HELLO FROM WARNING LEVEL");
     logger.error("HELLO FROM ERROR LEVEL");
