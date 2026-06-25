@@ -489,11 +489,114 @@ more readable and less error-prone than it would have been had the symbolic (and
 - If the user does not want the inbuilt constructor of a class, so that the object is not instantiated by just writing this piece of code >> `classname() = delete;`
 - **Video Summary:** The Cherno demonstrates how to properly initialize class member variables using special methods called upon object instantiation. The tutorial covers creating default and parameterized constructors to replace manual initialization methods.
 
+```cpp
+#include <iostream>
+
+class log{
+public:
+    enum class Log_Level{
+        LEVEL_ERROR,
+        LEVEL_WARNING,
+        LEVEL_INFO
+    };
+private:
+    Log_Level __log_level;
+public:
+    // Default Constructor
+    log(){
+        __log_level = Log_Level::LOG_LEVEL_INFO;
+        std::cout << "LOG INSTANCE CREATION SUCCESS - WITH LOG LEVEL: " << (int)__log_level << std::endl;
+    }
+
+    // Constructor with input arguments option
+    log(Log_Level level){
+        __log_level = level;
+        std::cout << "LOG INSTANCE CREATION SUCCESS - WITH LOG LEVEL: " << (int)__log_level << std::endl;
+    }
+
+    // APIs
+    void log_set_level(Log_Level level){
+        //
+    }
+    
+    void log_info(const char* message){
+        //
+    }
+
+    void log_warning(const char* message){
+        //
+    }
+
+    void log_error(const char* message){
+        //
+    }
+}
+
+int main(){
+    log file_logger(log::Log_Level::LEVEL_WARNING);
+    log console_logger(log::Log_Level::LEVEL_INFO)
+}
+```
+
 ## Destructors in C++
 - Destructors run when you destroy an object
 - You can create a destructor in a similar way like its done for a constructor, but just add a tilde (~) as a prefix, for e.g. `~entity(){ }`
 - Implemented the entire constructor to destructor cycle of an object by creating an object in a function to show the constructor and destructor outputs via print.
 - **Video Summary:** The Cherno demonstrates how to implement destructors to manage memory cleanup when objects go out of scope or are deleted. Examples include using breakpoints in Visual Studio to trace when the destructor is called on stack-allocated objects.
+
+```cpp
+#include <iostream>
+
+class log{
+public:
+    enum class Log_Level{
+        LEVEL_ERROR,
+        LEVEL_WARNING,
+        LEVEL_INFO
+    };
+private:
+    Log_Level __log_level;
+public:
+    // Default Constructor
+    log(){
+        __log_level = Log_Level::LOG_LEVEL_INFO;
+        std::cout << "LOG INSTANCE CREATION SUCCESS - WITH LOG LEVEL: " << (int)__log_level << std::endl;
+    }
+
+    // Default Destructor
+    ~log(){
+        std::cout << "LOG INSTANCE WILL BE DESTROYED DUE TO DESTRUCTOR BEING TRIGGERED" << std::endl;
+    }
+
+    // Constructor with input arguments option
+    log(Log_Level level){
+        __log_level = level;
+        std::cout << "LOG INSTANCE CREATION SUCCESS - WITH LOG LEVEL: " << (int)__log_level << std::endl;
+    }
+
+    // APIs
+    void log_set_level(Log_Level level){
+        //
+    }
+    
+    void log_info(const char* message){
+        //
+    }
+
+    void log_warning(const char* message){
+        //
+    }
+
+    void log_error(const char* message){
+        //
+    }
+}
+
+int main(){
+    log file_logger(log::Log_Level::LEVEL_WARNING);
+    log console_logger(log::Log_Level::LEVEL_INFO)
+}
+```
 
 ## Inheritance in C++
 - Discusses on Inheritance in C++ and how it helps programmers avoid duplication.
