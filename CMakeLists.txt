@@ -13,6 +13,7 @@ add_subdirectory(Cpp004_references)
 add_subdirectory(Cpp005_classes)
 add_subdirectory(Cpp006_static)
 add_subdirectory(Cpp007_enums)
+add_subdirectory(Cpp009_inheritance)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)
