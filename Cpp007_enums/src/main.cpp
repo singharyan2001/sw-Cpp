@@ -26,7 +26,36 @@ enum class TrafficLights{
 };
 
 // Creating Enums in Class
+class log{
+    public:
+        enum class Log_Level{
+            LEVEL_ERROR,
+            LEVEL_WARNING,
+            LEVEL_INFO
+        };
+    private:
+        Log_Level _log_level = Log_Level::LEVEL_INFO;
+    
+    public:
+        void set_log_level(Log_Level level){
+            _log_level = level;
+        }
+        
+        void error(const char* message){
+            if(_log_level >= Log_Level::LEVEL_ERROR)
+                std::cout << "[ERROR]" << " " << message << std::endl;
+        }
 
+        void warning(const char* message){
+            if(_log_level >= Log_Level::LEVEL_WARNING)
+            std::cout << "[WARNING]" << " " << message << std::endl;
+        }
+
+        void info(const char* message){
+            if(_log_level >= Log_Level::LEVEL_INFO)
+            std::cout << "[INFO]" << " " << message << std::endl;
+        }
+};
 
 
 int main(){
@@ -44,5 +73,13 @@ int main(){
     std::cout << "Traffic Lights Status: " << (int)col2 << std::endl;
 
     log_msg("===================================================");
+
+    log_msg("=========== USING ENUMS IN CLASS ===================");
+    log logger;
+    logger.set_log_level(log::Log_Level::LEVEL_INFO);
+    logger.info("HELLO FROM INFO LEVEL");
+    logger.warning("HELLO FROM WARNING LEVEL");
+    logger.error("HELLO FROM ERROR LEVEL");
+    log_msg("====================================================");
     std::cin.get();
 }
