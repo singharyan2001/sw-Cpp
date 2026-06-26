@@ -703,6 +703,12 @@ int main(){
 
 ## Virtual Functions in C++
 - Virtual functions allow us to override methods in sub-classes.
+- Virtual functions reduce dynamic dispatch which compilers typically implement by our VTable.
+- VTable is basically a table that contains the mapping of all the virtual functions aside our base class, so that we can actually map them to the correct overwritten function at runtime.
+- Discussed about the `virtual` and `override` keywords in C++.
+- Discussed the cost of using virtual functions:
+    - The additional memory required in order for us to store the VTable so that we can dispatch to correct function that includes a member pointer that points to the base class.
+    - Every time we call a virtual function, we have to go throught the VTable to determine which function to actually map to which is an additional performance penalty.
 
 ## Interfaces in C++
 
