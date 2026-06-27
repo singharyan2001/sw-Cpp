@@ -703,14 +703,98 @@ int main(){
 
 ## Virtual Functions in C++
 - Virtual functions allow us to override methods in sub-classes.
-- Virtual functions reduce dynamic dispatch which compilers typically implement by our VTable.
+- Virtual functions increase dynamic dispatch which compilers typically implement by our VTable.
 - VTable is basically a table that contains the mapping of all the virtual functions aside our base class, so that we can actually map them to the correct overwritten function at runtime.
 - Discussed about the `virtual` and `override` keywords in C++.
 - Discussed the cost of using virtual functions:
     - The additional memory required in order for us to store the VTable so that we can dispatch to correct function that includes a member pointer that points to the base class.
     - Every time we call a virtual function, we have to go throught the VTable to determine which function to actually map to which is an additional performance penalty.
 
+### Personal Notes
+To understand why `virtual` is necessary, you first need to see how the C++ Compiler behaves when it gets confused by pointers.
+1. The Problem: Static Dispatch (No Virtual)
+    1. Imagine you are writing a hardware driver, and you have a base `Peripheral` class and a `SPI` Class that inherits from it.
+        ```cpp
+        #include <iostream>
+
+        class Peripheral {
+        public:
+            void transmit() {
+                std::cout << "Sending generic peripheral data..." << std::endl;
+            }
+        };
+
+        class SPI : public Peripheral {
+        public:
+            void transmit() {
+                std::cout << "Sending fast SPI data!" << std::endl;
+            }
+        };
+        ```
+    2. The Scenario: You create an `SPI` object, but you store its address inside a `Peripheral*` pointer. (this is incredibly common in firmware when you wanr an array of generic pointers pointing to different specific sensors).
+        ```cpp
+        int main(){
+            SPI mySpibus;
+
+            // Create a base pointer pointing to the derived object
+            Peripheral* devPtr = &mySpibus;
+
+            // What happens here?
+            devPtr->transmit();
+            return 0;
+        }
+        ```
+    3. The Output: "Sending generic peripheral data"
+    4. Why did it fail? because of static dispatch, the compiler looked at `Peripheral* devPtr` and saw the type was `Peripheral*` and hardcoded a direct assembly jump to `Peripheral::transmit()`.
+    5. It completely ignored the fact that the actual object sitting in memory was an `SPI` object.
+2. The Solution: Dynamic Dispatch (Using `virtual`)
+    1. To fix this, we add the `virtual` keyword to the base class, and the `override` keyword to the derived class.
+        ```cpp
+        #include <iostream>
+
+        class Peripheral {
+        public:
+            // Virtual Tells the compiler: "Check the VTable at runtime!"
+            virtual void transmit() {
+                std::cout << "Sending generic peripheral data..." << std::endl;
+            }
+        };
+
+        class SPI : public Peripheral {
+        public:
+            // override tells the compiler: "Make sure i am actually overriding a virtual base function"
+            void transmit() override {
+                std::cout << "Sending fast SPI data!" << std::endl;
+            }
+        };
+        ```
+    2. Now if we run the same `main()` function, The Output: "Sending fast SPI Data!"
+    3. Why did it work? the compiler saw `virtual`, so it did not hardcode a jump, instead it injected assembly instruction to say "When we hit this line, look at the objecy `devPtr` is pointing to, find its hidden `_vptr`, follow it to the `SPI` VTable, and run whatever fucntion address is sitting there".
+3. The True Cost (Memory & Speed) - As a system engineer, you need to know exactly  what you are paying for this flexibility.
+    1. The Memory Penalty - When you add a virtual function, the compiler silently changes your memory layout:
+        1. The VTable (ROM/FLASH): The compiler creates an array of function pointers for the `SPI` class. this exists exactly once per class type. (Cost: ~4-8 bytes per virtual function per class)
+        2. The vptr (RAM): The Compiler injects a hidden pointer (`_vptr`) into the actual `SPI` object instance.
+            1. If `SPI` had an `int baud_rate` (4 bytes), `sizeof(SPI)` without virtual functions would be 4 bytes.
+            2. With virtual functions on a 64-bit system, `sizeof(SPI)` becomes 12 bytes (4 Bytes for the int + 8 Bytes for the hidden `_vptr`)
+
+    2. The Speed Penalty
+        1. To Call `devPtr->transmit()`, the CPU must perform extra work:
+            1. Fetch the Object's `_vptr` from RAM.
+            2. Dereference the _vptr` to find the VTable in FLASH.
+            3. Read the function address from the VTable.
+            4. jump to that function address.
+        2. This indirect jumping can cause Pipeline Stalls or Cache Misses in your CPU.
+
 ## Interfaces in C++
+- Discussed about a type of virtual function called a "pure virtual function".
+- A pure virtual function allows us to define a function in a base class that does not have an implementation, and then force subclasses to actually implement that function.
+- Discusses on why programmers create base class that consists of only unimplemented methods, and the forc a subclass to actually implement them, and this is often referred to as an interface.
+- An Interface is a class that only consists of unimplemented methods and acting as a template of sorts.
+- An Interface class doesn't actually contain method implementations, therefore not possible to instantiate this type of class.
+- Discussed the C++ Interface Hierarchy & Concrete Sub-Classes
+    - An Interface (a class containing at least one pure virtual function) cannot be instantiated. Any sub-class inheriting from it must implement those pure virtual functions to become a concrete class (a class you can actually create objects from).
+    - However, once a sub-class fully implements those pure virtual functions, the requirement is satisfied for the entire branch of that family tree. Any further sub-classes down the chain inherit that implementation and are instantly concrete—they do not have to re-implement the interface functions unless they want to override them.
+
 
 ## Visibility in C++
 
