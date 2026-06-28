@@ -16,6 +16,7 @@ add_subdirectory(Cpp007_enums)
 add_subdirectory(Cpp009_inheritance)
 add_subdirectory(Cpp010_virtual_functions)
 add_subdirectory(Cpp011_interfaces)
+add_subdirectory(Cpp012_visibility)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)

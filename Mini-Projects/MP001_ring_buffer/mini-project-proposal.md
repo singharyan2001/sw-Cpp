@@ -78,7 +78,7 @@ typedef struct{
 ### C Style Implementation Habit in C++
 Note: This was not an issue wrt compilation and execution, but C Style habit was implemented for enums an structures, just implemente using C++ style
 1. using typedef for enum and structure - which is not required in c++ as 
-2. Used #define to creatq quick printf functions which is C Style, in Mordern C++ >> macros are heavily discouraged because they bypass the compiler's type-checking and make debugging difficult, move from `macros` to `inline functions` as they give exact same performance as a macro but are completely type-safe and respect namespaces.
+2. Used #define to creatq quick printf functions which is C Style, in Modern C++ >> macros are heavily discouraged because they bypass the compiler's type-checking and make debugging difficult, move from `macros` to `inline functions` as they give exact same performance as a macro but are completely type-safe and respect namespaces.
 
 ### Mistakes done in the mini-project
 1. Forgot to use the modulo operation during push and pop operations, immediately integrated and tested.

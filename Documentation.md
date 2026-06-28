@@ -406,7 +406,7 @@ Note: Chapter 01 is now completed in reference textbook - A Tour of C++.
         2. The compiler still puts the variable in RAM, but it refuses to write its name into the public symbol table.
         ```cpp
         // 3. Example >> inside driver_a.cpp
-        int global_speed = 100; // Publuc to the whole project
+        int global_speed = 100; // Public to the whole project
         static int private_offset = 12; // Strictly trapped inside driver_a.cpp file
         ```
 
@@ -876,5 +876,12 @@ To understand why `virtual` is necessary, you first need to see how the C++ Comp
 
 
 ## Visibility in C++
-
+- Discussed visibility in Classes.
+- Visibility concept implementation in classes does not have any effect of performace of speed in runtime.
+- Visibility in C++ has 3 basic modifiers i.e. `public`, `protected`, `private`.
+- Discussed about `friend` keyword.
+- When using `public` keyword in a class, all attributes and methods under the keyword is accessable to outside code by calling the `instance.attribute` or `instance.method()`.
+- When using the `private` keyword in a class all attributes and methods under the keyword is not accessable to outside code and can only be used by the class and the programmer might need to create public methods to do any operations on the private data attributes or methods. Note: even sub-classes cannot call these data attributes or methods directly.
+- When using `protected` keyword in a class, all attributes and methods under the keyword can be accessed by the class and all sub-classes, but no access to outside code to those protected data attributes and methods.
+- Discussed few example use-cases/application of visibility modifiers in C++
 
