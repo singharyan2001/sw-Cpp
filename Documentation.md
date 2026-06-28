@@ -795,6 +795,85 @@ To understand why `virtual` is necessary, you first need to see how the C++ Comp
     - An Interface (a class containing at least one pure virtual function) cannot be instantiated. Any sub-class inheriting from it must implement those pure virtual functions to become a concrete class (a class you can actually create objects from).
     - However, once a sub-class fully implements those pure virtual functions, the requirement is satisfied for the entire branch of that family tree. Any further sub-classes down the chain inherit that implementation and are instantly concrete—they do not have to re-implement the interface functions unless they want to override them.
 
+### Personal Notes
+1. In C++, an Interface isn't a special keyword.
+2. An Interface is simply a standard C++ `class` where at least one virtual function is set to `=0`. We cann this an Abstract Class.
+3. The Syntax & The Hardware Contract
+    1. When you append `=0` to a virtual function, you are creating a "Pure virtual Interface".
+        ```Cpp
+        // The 'I' prefix is a naming convection meaning "Interface"
+        class ICommBus {
+        public:
+            // pure Virtual Function: "I will not write this code. You must."
+            virtual void transmit(uint8_t data) = 0;
+
+            // Always include a virtual destructor in an Interface!
+            virtual ~ICommBus() = default;
+        };
+        ```
+    2. The VTable Reality of `=0`: why `=0`? >> It is actually a literal instruction to the compiler.
+    3. It tells the compiler: "Put a `NULL` pointer in the VTable for this function".
+    4. Becasue the VTable contains a `NULL` pointer, if you tried to create an `ICommBus` object and call `transmit()`, the CPU would jumpt to `NULL` and the system would instanty crash (Segmentation Fault).
+    5. This is why the compiler strictly forbids you from instantiating an Interface.
+4. Enforcing the Contract (The Concrete Class)
+    1. When a subclass inherits from an interface, it signs a contract. If it does not provide an implementation for every single pure virtual function, the compiler treats the subclass as an Interface too, and refuses to let you instantiate it.
+    2. Scenario A: The Broken Contract
+        ```cpp
+        class I2CBus : public ICommBus {
+        public:
+            void init() {
+                // Did some setup, but forgot to implement transmit()!
+            }
+        };
+
+        // COMPILER ERROR! I2CBus is still an abstract class because transmit() is missing.
+        I2CBus myI2C; 
+        ```
+        1. E.g. Firmware benefit: this is a massive safety net. if a junior engineer tries to write a new SPI driver but forgets to implement the core `transmit` function, this code simply won't compile.
+    3. Scenario B: the Fullfilled Contract (Concrete Class)
+        ```cpp
+        class I2CBus : public ICommBus {
+        public:
+            // The contract is fulfilled! The compiler is happy.
+            void transmit(uint8_t data) override {
+                // Code to write data to the STM32 I2C Data Register...
+            }
+        };
+
+        // SUCCESS! You can now create objects of this type.
+        I2CBus myI2C; 
+        ```
+    4. The Family Tree (Concrete Propagation)
+        1. Once a sub class fully implements those pure virtual functions, the requirement is satisfied for the entire branch of that family tree.
+        2. For E.g. you want to make a specialized version of your i2c bus that automatically retries if the transmission fails.
+        ```cpp
+        // Family Tree Example: FastI2CBus inherits from I2CBus (which already fullfilled the ICommBus contract)
+        class FastI2CBus : public I2CBus {
+        public:
+            void setFastMode() {
+                std::cout << "I2C BUS FAST MODE SET" << std::endl;
+            }
+
+            // Note that we did not implement transmit() here
+        };
+
+        int main(){
+            std::cout << "==== TOPIC: INTERFACES IN C++ ====" << std::endl;
+
+            FastI2CBus myFastBus; //Instantiate - SUCCESS
+
+            myFastBus.setFastMode();
+            // The above instance automatically uses the transmit() implementation which it inherited from the parent I2CBus Cass
+            myFastBus.transmit(0xff);
+
+            std::cout << "==================================" << std::endl;
+            std::cin.get();
+        }
+        ```
+        3. Because `I2CBus` provided the memory address for `transmit()` to the VTable, `FastI2CBus` inherits a fully populated VTable (no `NULL` POINTERS).
+        4. It is instantly a Concrete Class without you having to write any extra boilerplate code.
+        5. If `FastI2CBus` wanted to change how transmitting works, it could imply `override` the function again, replacing the Parent's VTable entry with its own.
+
 
 ## Visibility in C++
 
