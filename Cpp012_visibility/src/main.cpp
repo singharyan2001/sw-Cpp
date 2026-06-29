@@ -2,6 +2,8 @@
 #include <iostream>
 #include <stdint.h>
 
+#include "vector.h"
+
 // The 'I' prefix is a naming convection meaning "Interface"
 class ICommBus {
 private:
@@ -47,7 +49,16 @@ int main(){
 
     I2CBus mySensorBus;     //Instantiate - SUCCESS
     mySensorBus.transmit(0x23);
+
+    std::cout << "==================================" << std::endl;
     
+    std::cout << "======== Vector example to show header & source file implementation in C++ ========" << std::endl;
+    Vector myVec(10);
+    myVec[3] = 44.5;
+    for(int i=0; i < 10; i++){
+        std::cout << "Value in vector class array: " << myVec[i] << std::endl;
+    }
+
     std::cout << "==================================" << std::endl;
     std::cin.get();
 }

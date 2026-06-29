@@ -885,3 +885,54 @@ To understand why `virtual` is necessary, you first need to see how the C++ Comp
 - When using `protected` keyword in a class, all attributes and methods under the keyword can be accessed by the class and all sub-classes, but no access to outside code to those protected data attributes and methods.
 - Discussed few example use-cases/application of visibility modifiers in C++
 
+---
+
+## Separate Compilation in C++ (Reference Textbook Ch3:3.2)
+- C++ supports a notion of separate compilation where user code sees only declarations of the types and functions used.
+- The definitions of those types and functions are in separate source files and compiled separately.
+- This can be used to organize a program into a set of semi-independent code fragments, such separation can be used to minimize compilation times and to strictly enforce separation of logically distinct part of a program, thus minimizing the chance of errors.
+- A Library is often a collection of separately compiled code fragments (e.g. functions).
+- E.g. Implementation of a Header file and Source file for Vector class code design
+    - Programmers will implement a header file `vecotr.h`
+    ```cpp
+    // vector.h
+    class Vector{
+    private:
+        double* elem;   // elem points to an array of sz double
+        int sz;
+    public:
+        Vector(int s);
+        double& operator[](int i);
+        int size();
+    };
+    ```
+    - Programmers will then implement a `vector.cpp` file that will house the implementation of the header file declarations
+    ```cpp
+    // Vector.cpp
+    #include "vector.hpp"
+
+    Vector::Vector(int s) : elem{new double[s]}, sz{s} {}
+
+    double& Vector::operator[](int i) {
+        return elem[i];
+    }
+
+    int Vector::size() {
+        return sz;
+    }
+    ```
+    - Note: Compared to C, C++ in the above implementation si doing three massive things i.e. Scope binding, Pre-body Initialization, and Operator Overloading.
+        - The Scope Resolution Operator (`::`): In C++, `::` tells the compiler: "I am defining a function, but it strictly belongs to the `Vector` class blueprint defined in the header". It implicity passes the pointer to the object behind the scenes, so you dont have to pass it as an argument, like its done in C i.e. `void Vector_Init(Vector_t* v, int s)`.
+        - The Member Initializer List (`:`): In C++, there is a strict difference between Initialization (giving memory a value the moment it is created) and Assignment (overwriting existing memory with a new value).
+            - The Code after the colon `:` runs before the code inside the `{}`.
+            - It initalizes `elem` and `sz` directly into memory.
+            - If you did it inside the `{}` (like its done in C), C++ would first creare the variables with garbage values, and then you would overwrite them.
+            - The Initalizer List skips the garbage step, saving CPU cycles. it is standard practice in modern C++.
+        - The Dynamic Memory (`new` vs `malloc`): C++ introduces `new` which calculates the size for you based on the type, handles the type-casting automatically, and if you were creating an array of objects rather than standard `double`, it would automatically call the constructors for every single object in the array.
+        - The Operator Overloading & references: `double& Vector::operator[](int i)` - this is pure C++, in C, you cannot change what mathematical symbols or brackets do. To get an element, you'd have to write a function like `double get_item(Vector* v, int i)`, but by naming the function `operator[]`, C++ allows you to use your custom class like a native array, for e.g
+        ```cpp
+        Vector myVec(10);
+        myVec[3] = 42.5; // this secretly calls your operator[] function!
+        ```
+        - Note: by returning a `&` Reference, you hand the exact memory address abck to the caller, allowing them to overwrite the value.
+    - Programmers will include the header file `vector.h or .hpp` in main.cpp to access vector implementation
