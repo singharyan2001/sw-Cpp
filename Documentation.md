@@ -936,3 +936,219 @@ To understand why `virtual` is necessary, you first need to see how the C++ Comp
         ```
         - Note: by returning a `&` Reference, you hand the exact memory address abck to the caller, allowing them to overwrite the value.
     - Programmers will include the header file `vector.h or .hpp` in main.cpp to access vector implementation
+
+## Namespaces in C++
+- C++ offers namespaces as a mechansim for expressing that some declarations belong together and that their names shouldn't clash with other names.
+- In C, the concept of a "namespace" doesn't exist. All functions and global variables live in one giant, global pool.
+- If you are writing firmware in C and you have a UART driver and an SPI Driver, you cannot name there initialization functions `init()`. The linker will throw a "Multiple Definition" error because it sees two `init` symbols in the global table. To fix this, you use prefixes: `UART_init()` and `SPI_init()`.
+- In C++, Namespaces exist to solve exactly this problem. A namespace is simply a named box that you put your code inside to keep it isolated from the rest of the project.
+- Note: The Scope Resolution Operator `::` is used with namespace
+- How to define a namespace:
+```cpp
+#include <iostream>
+#include <stdint.h>
+
+namespace UART {
+    int baud_rate = 115200;
+    
+    void init(){
+        std::cout << "UART Peripheral Initialized" << std::endl;
+    }
+
+    void transmit(char data){
+        std::cout << "Transmitting data via UART: " << data << std::endl;
+    }
+}
+
+namespace SPI {
+    int clock_speed = 400'000;
+    
+    void init(){
+        std::cout << "SPI Peripheral Initialized" << std::endl;
+    }
+
+    void transmit(char& data){
+        std::cout << "Transmitting data via SPI: 0x" << std::hex << (int)(unsigned char)data << std::endl;
+    }
+}
+
+
+int main(){
+    std::cout << "==== Topic: Namespaces in C++ ====" << std::endl;
+    char spi_byte = 0xAA;
+    UART::init();
+    SPI::init();
+
+    UART::transmit('A');
+    SPI::transmit(spi_byte);
+
+    std::cout << "==================================" << std::endl;
+    std::cin.get();
+}
+```
+- C++ offers the `using` keyword to remove UART::<> or SPI::<> while using the namespace box definitions.
+
+## Error Handling in C++
+- C++ introduces Exceptions with `try`, `catch`, and `throw` keywords to ensure errors cannot be ignored. If an error occurs and nobody handles it, the program stops immediately.
+- In C++, when a function detects a problem that it cannot solve on its own, it throws an exception. It is essentially hitting the emergency stop button and saying, "I can't continue. Whoever called me needs to deal with this."
+
+### exceptions
+- The Core Syntax: `throw`, `try`, and `catch`:
+    - Instead of returning a -1 status code, we use the `throw` keyword. To handle the thrown error safely, the caller wraps the dangerous code in a `try` block, and `catches` the error in a catch block.
+    ```cpp
+    #include <iostream>
+    #include <stdexcept> // Standard C++ exception types
+
+    // A mock function that might fail
+    int readSensorData(int pin) {
+        if (pin < 0 || pin > 15) {
+            // We throw an exception object instead of returning -1
+            throw std::invalid_argument("Hardware error: Invalid pin number!");
+        }
+        
+        return 1024; // Simulated valid reading
+    }
+
+    int main() {
+        try {
+            // The compiler attempts to run this code
+            std::cout << "Reading pin 5: " << readSensorData(5) << std::endl;
+            
+            // This will trigger the exception!
+            std::cout << "Reading pin 99: " << readSensorData(99) << std::endl; 
+            
+            // This line will NEVER execute because the line above threw an exception.
+            std::cout << "All sensors read successfully." << std::endl;
+            
+        } catch (const std::invalid_argument& e) {
+            // If an invalid_argument exception is thrown anywhere in the 'try' block, 
+            // the CPU jumps immediately here.
+            std::cout << "CAUGHT EXCEPTION: " << e.what() << std::endl;
+        }
+        
+        return 0;
+    }
+    ```
+    ```text
+    Output Log:
+    Reading pin 5: 1024
+    Reading pin 99: CAUGHT EXCEPTION: Hardware error: Invalid pin number!
+    ```
+### Invarients
+- Why use Exceptions instead of Error Codes? (The Constructor Problem)
+    - In Object-Oriented C++, Constructors do not have return types.
+    - If you try to creare a `RingBuffer` object, but the system doesn't have enough RAM to allocate the array, how does the constructor tell `main()` that it failed? it can't return `false`.
+    - The Creator of C++ call this establishing an **Invarient** which means that a rule that must be true for the object to exist.
+    - If the Constructor cannot establish the invarient, it must throw an exception. this guarantees that if an object existsm it is completely valid and safe to use.
+    - Example code:
+        ```cpp
+        class NetworkSocket {
+        public:
+            NetworkSocket(int port) {
+                if (port < 1024) {
+                    throw std::runtime_error("Cannot bind to privileged port!");
+                }
+                // Bind port...
+            }
+        };
+
+        int main() {
+            try {
+                NetworkSocket mySock(80); // Fails to construct! Throws exception.
+            } catch (const std::runtime_error& e) {
+                std::cout << "Failed to start server: " << e.what() << '\n';
+            }
+        }
+        ```
+        ```text
+        Output Log:
+        Failed to start server: Caught Exception: Cannot bind to privileged port!
+        ```
+- Firmware Compatibiltiy check (No exception mode)
+    - While A Tour of C++ teaches exceptions as the gold standard, firmware and game engine developers often ban them.
+    - If you look at the compilation flags for many STM32, Arduino, or high-performance game engine projects, you will see this flag: `-fno-exceptions`.
+    - Why do embedded engineers turn exceptions off?
+        - Flash Memory Bloat (Stack Unwinding):
+            - To make try/catch work, the compiler must inject massive "Exception Tables" into your binary.
+            - When an exception is thrown, a hidden C++ runtime function must walk backward through the call stack (called "unwinding"), figuring out exactly which local objects need their destructors called before it finally lands in your catch block.
+            - This metadata can bloat your `.bin` file by 10% to 30%, which is catastrophic on a microcontroller with only 64KB of total Flash memory.
+    - Unpredictable Timing (Non-Deterministic execution):
+        - In a real-time operating system (RTOS) or a high-speed hardware interrupt (like a 1kHz drone motor PID loop), you need absolute, deterministic execution times.
+        - The process of searching up the call stack for a catch block takes an unpredictable amount of CPU cycles.
+        - If a sensor error takes 5 microseconds to handle today, but 150 microseconds tomorrow because the stack was deeper, your drone's control loop will miss its deadline and crash.
+- What do we use instead for firmware?
+    - If you compile with -fno-exceptions, you go back to the C-style philosophy (returning errors), but you use modern C++ safety wrappers instead of raw -1 integers.
+    - **Alternative 1:** Error Structs (The simple C++ Way)
+        - Instead of passing pointers to get multiple values back like in C, we return a lightweight struct containing both the data and a strictly-typed error enum. 
+        ```cpp
+        enum class SensorStatus { OK, I2C_ERROR, TIMEOUT };
+
+        struct SensorResult {
+            float temperature;
+            SensorStatus status;
+        };
+
+        SensorResult readTemp() {
+            // Hardware read failed! Return 0.0 for data, and the specific error flag.
+            return { 0.0f, SensorStatus::I2C_ERROR }; 
+        }
+        ```
+    - **Alternative 2:** `std::optional` (C++17)
+        - Perfect for when a function might just fail to find something.
+        - It returns a wrapper that holds "either the value, or literally nothing."
+        - It forces the caller to check if the data exists before using it.
+        ```cpp
+        #include <optional>
+
+        std::optional<int> getBufferData() {
+            if (buffer_empty) return std::nullopt; // Fails safely
+            return 42; // Succeeds
+        }
+
+        // In main.cpp:
+        auto data = getBufferData();
+        if (data.has_value()) {
+            std::cout << data.value();
+        }
+        ```
+    - **Alternative 3:** `std::expected` (C++23)
+        - The modern holy grail for firmware.
+        - It holds either the expected return value or a specific error code (very similar to Rust's famous Result type).
+        - It has zero memory overhead compared to exceptions.
+
+- The notion of invariants is central to the design of classes, and preconditions serve a similar role in the design of functions.
+- Invarients helps us to understand precisely what we want, and forces us to be specific; that gives us a better chance of getting our code correct(after debugging and testing).
+- The notion of invarients underlies C++'s notions of resource management supported by contructors and destructors.
+
+### Static Assertions - Compile-Time Error Handling (`static_assert`)
+- Exceptions report errors found at run time. Everything discussed above handles Runtime Errors.
+- C++ also provides a mechanism for Compile-Time Error handling using the `static_assert` keyword. this tells the compiler: "If this mathematically condition is false, fail the build immediately."
+- Because `static_assert` is evaluated exclusively by the compiler, it generates zero assembly code and has absolutely no CPU or Memory cost.
+- The Firmware Use-Case: Memory Mapping
+    - In firmware, you often map C++ structs directly over hardware registers.
+    - If a 32-bit register bank requires exactly 12 bytes of data, but someone accidentally adds an extra `uint32_t` to the struct, the struct becomes 16 bytes.
+    - When you write this to the hardware, the system will crash or behave erratically.
+    - You can use `static_assert` to make the compiler guard your hardware constraints:
+    ```cpp
+    #include <cstdint>
+
+    // Simulating a memory-mapped hardware register configuration
+    struct SpiRegisters {
+        uint32_t control;
+        uint32_t status;
+        uint32_t data;
+    };
+
+    // The compiler checks this before building the binary!
+    // If someone adds a variable to SpiRegisters, the build will instantly fail.
+    static_assert(sizeof(SpiRegisters) == 12, "FATAL: SpiRegisters struct must be exactly 12 bytes to match hardware!");
+
+    int main() {
+        // Normal code here...
+        return 0;
+    }
+    ```
+    - By putting `static_assert` checks throughout your firmware, you catch configuration errors, architecture mismatches, and alignment issues before you ever flash the board.
+
+- Note: Chapter 3 is completed wrt topic coverage.
+---
