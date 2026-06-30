@@ -1658,3 +1658,15 @@ A C++ systems engineer, memorizes these decision tree:
 2. Use the Heap (`new`) ONLY if:
     1. The Object is incredibly large (e.g. a 10MB network buffer).
     2. You explicitly need the object's lifetime to outlive the scope `{ }` in which it was created.
+
+## The `new` Keyword in C++
+- Discussed that the new keyword's main purpose is to allocate memory on the Heap Memory.
+- Syntax: `new <datatype>`
+- Discussed how the `new` keyword works in the background in C++.
+- Discussed the primary takeaway of the new keyword i.e. it takes time (speed -> slow)
+- Discussed how `new` keyword works with normal data types and classes.
+- Discussed how `new` keyword and `malloc()` based implementation looks like and how the constructor needs to be manually called if `malloc()` is used (generally used in C wrt `malloc()`) if used in C++.
+- Discussed that in C++, creating an object requires two distinct steps: allocating raw heap memory and initializing the object (running its constructor). The `new` keyword automates both steps, whereas the C-style `malloc()` function only handles the raw memory layout.
+- Summary: The Cherno explores the fundamentals of dynamic memory allocation using the `new` keyword to place data on the heap. Learn how to allocate primitive types, arrays, and objects, while understanding the essential relationship between allocating memory and calling constructors in C++.
+
+### Personal Notes
