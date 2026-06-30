@@ -1165,8 +1165,323 @@ A Member Initializer List is a syntax used in constructor definitions to initial
 
 To Understand why this feature exists, lets look at what compiler does behind the scene when you initialize a custom object (like a hardware peripheral driver) inside another class.
 
-Scenario A: Wthout Initializer List (The C Style habit)
-
+Below is an example code written, and we will be toggling the `MODERN_PATTERN` enable/disable to see how it affects initialization.
+So by Disabling the `MODERN_PATTERN` by setting it to 0, we enable the Anti-Pattern to see what happens because of this in the output log.
 ```cpp
+// Member Initializer List in C++
+#include <iostream>
 
+#define MODERN_PATTERN_CPP  0
+
+class UartDriver {
+public:
+    UartDriver(){
+        /*Default constructor: Boots in low-power mode*/
+        std::cout << "DEFAULT CONSTRUCTOR: BOOTINT IN LOW POWER MODE" << std::endl;
+    }
+    UartDriver(int baud){
+        /* Configures high-speed baud rate */
+        std::cout << "DEFAULT CONSTRUCTOR: BOOTINT IN NORMAL MODE AT BAUD RATE: " << baud << std::endl;
+    }
+
+    void setBaud(int b){
+        /* Overwrites baud rate */
+        std::cout << "SETTING BAUD RATE TO: " << b << std::endl;
+    }
+};
+
+class FlightController {
+private:
+    UartDriver gps_uart; // A Custom class member
+    int error_count;
+public:
+#if MODERN_PATTERN_CPP
+    // Modern-Pattern: Direct Memory Intialization
+    FlightController(int baud_rate) : gps_uart(baud_rate), error_count(0) {
+        // Constructor Body is now empty - and creation & Initialization is done only once now.
+    }
+#else
+    // Anti-pattern Assigning inside the constructor body
+    FlightController(int baud_rate){
+        gps_uart = UartDriver(baud_rate);
+        error_count = 0;
+    }
+#endif
+};
+
+int main(){
+    std::cout << "========== TOPIC: Member Intializer List in C++ ==========" << std::endl;
+    FlightController fc(9600);
+
+    std::cout << "==========================================================" << std::endl;
+    std::cin.get();
+}
 ```
+```text
+Output Log:
+========== TOPIC: Member Intializer List in C++ ==========
+DEFAULT CONSTRUCTOR: BOOTINT IN LOW POWER MODE
+DEFAULT CONSTRUCTOR: BOOTINT IN NORMAL MODE AT BAUD RATE: 9600
+==========================================================
+```
+
+What actually happened in CPU Cycles? Because we didn't use an intializer list, C++ executes a Hidden Step 0 before constructor `{}` block runs.
+1. Step 0 (hidden): The Compiler allocates `gps_uart` ad calls its default constructor `UartDriver()`.
+2. Step 1 (Inside body): It Created a Temporary `UartDriver(baud_rate)` object.
+3. Step 2: The Compiler uses the Assignment Operator `=` to copy the temporary object into `gps_uart`.
+4. Step 3: The Temporary object is destroyed.
+5. ResultL YOu booted the peripheral twuce and wasted memory allocations.
+
+Now by enabling the `MODERN PATTERN` by setting 0 -> 1, we can totally see a different result:
+```text
+Output Log:
+========== TOPIC: Member Intializer List in C++ ==========
+DEFAULT CONSTRUCTOR: BOOTINT IN NORMAL MODE AT BAUD RATE: 9600
+==========================================================
+```
+
+What happened here? the compiler directly constructs `gps_uart` in its final memory address using `UartDriber(baud_rate)`, it skips step 0 and therefore the results obtained are Zero wasted cycles of the CPU and the Default Constructor is completely bypassed.
+
+**When Initializer Lists are Mandatory**
+
+In Modern C++, there are three scenarios where the compiler will flat-out refuse to build the project if you dont use an Initializer Lists:
+1. `const` Member Variables: Once memory is marked `const`, it cannot be assigned to via `=`. It must receive its value at the exact microsecond of its birth.
+```cpp
+// Const example for member intializer list
+class Sensor {
+private:
+    const int i2c_address;
+public:
+    // ERROR: Cannot assign to variable 'i2c_address' with const-qualified type.
+    // Sensor(int addr) { i2c_address = addr; }
+    
+    // SUCCESS: Initialized at birth
+    Sensor(int addr) : i2c_address(addr) {
+        // Empty constructor
+    }
+};
+```
+2. `reference` Member Variables: just like `const`, C++ references cannot be "empty" or re-seated. They must be intialized immediately.
+```cpp
+// reference example for member intializer list
+class DataLogger {
+private:
+    int& rx_buffer; // Reference to an external buffer
+public:
+    DataLogger(int& buf) : rx_buffer(buf) {
+        // Empty Constructor
+    }
+};
+```
+3. Objects without a default constructor: If you use a third party object that only has a constructor requiring arguments (no `Object()`), you cannot construct it inside the `{}` body.
+
+**The Declaration Order Trap**
+
+Rule: Class Members are always initialized in the exact order they are declared in the class definition (the `.h` file), completely ignoring the order you type them in the initalizer List.
+
+Note: If the rule is not followed then there could be unefined behaviour of the object, for e.g.
+```cpp
+class BadActuator {
+private:
+    int raw_scaling_factor;
+    int calibrated_speed;
+public:
+    // DANGER! Looks innocent, but causes undefined behavior.
+    BadActuator(int input) : calibrated_speed(raw_scaling_factor * 2), raw_scaling_factor(input) {}
+};
+```
+
+Why does this crash? when we look at the `private` section, the `raw_scaling_factor` is declared first. Therefore, the compiler intializes it first.
+1. The Compiler intializes `raw_scaling_factor`. But in the constructor member list, the value is not given yet, so it gets unintialized garbage RAM data.
+2. The Compiler then initializes `calibrated_speed` using `raw_scaling_factor * 2`
+3. The Compiler finally sets `raw_scaling_factor = input`
+4. Now the `calibrated_speed` is corrupted.
+
+What can be done to avoid this? the fix could be enabling the `-Wreorder` flag in the GCC/CMake Compiler, since modern compilers will warn you if your intializer list doesn't match your header declaration order.
+
+## const in C++
+- Discussed const keyword
+- Discussed using const with pointers
+- Discussed using const with classes.
+- Discussed const pointer return with pointer contents const as well and the function is also const, therefore no modifications in the function - `const int* const GetX() const {}`.
+- Discussed using const with reference and passing arguments as const. (e.g. `void printEntity)const Entity& e){}` )
+- Discussed calling const functions from classes and having identical function with const and no const function.
+- Discussed mutable keyword and use case inside a const function.
+- The Cherno Explains how the const keyword functions as a promise in C++ to prevent accidental modifications to variables, pointers, and class members. Learn to improve code safety by applying const to methods and understanding the difference between constant pointers and pointers to constants.
+
+### Personal Notes
+In C++, `const` is a mechanism to enforce read-only safety. Once you label something `const`, the compiler will aggressively throw errors if you or anyone else attempts to modify it.
+
+**Pass by const reference**
+
+This is the most common use of `const`, when passing a large struct (like a 100-byte `SensorPayload`) to a function, passing by value creates a slow, 100 byte memory copy.
+Passing by reference(`&`) is fast (it just passes the 8-byte memory address), but it gives the function the power to accidently overwrite data.
+
+The solution is to combine both `reference` and `const`.
+```cpp
+// const in C++
+#include <iostream>
+
+struct SensorPayload {
+    float temp[20];
+    int timestamp;
+};
+
+// FAST (no copy) and SAFE (read-only)
+void printPayload(const SensorPayload& payload){
+    std::cout << payload.timestamp << std::endl;
+    
+    // COMPILER ERROR: Cannot assign to variable 'payload' with const-qualifed type
+    // payload.timestamp = 0;
+}
+
+int main(){
+    std::cout << "========== TOPIC: const in C++ ==========" << std::endl;
+    const SensorPayload data = {
+        {24.6, 27.3},
+        123443
+    };
+    printPayload(data);
+
+    std::cout << "=========================================" << std::endl;
+}
+```
+
+**The Pointer Puzzle (Read Right-to-Left)**
+
+When combining `const` with pointers(`*`), the golden rule of C++ is to read the declaration beackward (right to left).
+
+1. A Pointer to a Constant (`const int* ptr`)
+    1. Read Right-to-Left: `ptr` is a pointer(`*`) to an integer(`int`) that is constant(`const`)
+    ```cpp
+    // EXAMPLE: A Pointer to a Constant (data)
+    int a = 5;
+    int b = 10;
+    const int* ptr = &a;    // ptr is a pointer to an integer that is constant.
+    ptr = &b;               // OK: You can change WHERE the pointer points.
+    //*ptr = 7;             // ERROR: You cannot change the VALUE it points to.
+    ```
+2. Constant Pointer (`int* const ptr`)
+    1. Read Right-to-Left: `ptr` is a pointer that is constant(`const`) to an integer(`int`)
+    ```cpp
+    // EXAMPLE: Constant Pointer
+    int* const ptr2 = &a;   // ptr2 is a pointer that is constant to an integer.
+    *ptr2 = 7;              // OK: You can change the data WHERE the pointer is pointing to.
+    //ptr2 = &b;              //ERROR: You cannot change WHERE the pointer is pointing to.
+    ```
+3. Constant Pointer to a Constant (`const int* const ptr`)
+    1. Read Right-to-Left: `ptr` is a pointer that is constant(`const`) to an integer(`int`) that is constant(`const`).
+    ```cpp
+    // EXAMPLE: Constant Pointer to a Constant (data)
+    const int* const ptr3 = &b; // ptr3 is a pointer that is constant to an integer that is constant.
+    //*ptr3 = 20;           // ERROR: You cannot change the VALUE the pointer points to.
+    //ptr3 = &a;            // ERROR: You cannot change WHERE the pointer points to.
+    // // Completely locked down. You can only read it.
+    ```
+
+**Const Methods in Classes**
+
+1. When you put `const` at the end of a class method, you are making a promise: "This method will not modify any member variables of this class."
+    ```cpp
+    // Class Methods in Classes
+    class UartDriver {
+    private:
+        int baud_rate = 115200;
+    public:
+        // A normal Method (can modify state)
+        void setBaud(int new_baud){
+            baud_rate = new_baud;
+        }
+
+        // A Const Method (Read-Only)
+        int getBaud() const {
+            // baud_rate = 9600; // COMPILER ERROR: Method is const!
+            return baud_rate;
+        }
+    };
+    ```
+2. Why does this matter? if you pass a `UartDriver` to a function as a `const UartDriver&`, the compiler will only let you call methods that have `const` at the end! It protects the Object.
+3. Example: `const int* const GetX() const {}`:
+    1. Function Syntax: `<return-type>``function-name``Qualifier`{}
+    2. `const int* const` (The Return Type): It returns a pointer, and the pointer itself cannot be redirected to a new address, and the integer it points to cannot be modified.
+    3. `GetX()` (The Name): The Function Name.
+    4. `const` (The Method Qualifier): Calling this function will not modify any variables inside the class it belongs to.
+
+<!-- **Const Overloading**  -->
+
+## The Mutable keyword
+- Discussed on mutable keyword.
+- Discussed mutable keyword's 2 main use cases i.e. `const` and `lambda` in C++.
+
+### Personal Notes
+1. Sometimes, you have a `const` method (like reading a sensor), but you need to modify a hidden "background" variable, like a debug counter or a hardware cache.
+2. If a method is `const`, it can't modify anything. To bypass this for a specific variable, you mark that variable as a `mutable`.
+    ```cpp
+    #include <iostream>
+
+    // EXAMPLE: Mutable Keyword in a const method in a class
+    class TemperatureSensor {
+    private:
+        int i2c_address;
+        mutable int read_count_since_boot = 0;  // Allowed to change even in const methods!
+    public:
+        TemperatureSensor(int addr) : i2c_address(addr) {
+            std::cout << "Temperature Sensor Object Instantiated Successfully" << std::endl;
+        }
+
+        // A Const Method - to promise that no changes will be done in the function/method
+        float getTemp() const {
+            // Read Sensor
+            std::cout << "Temperature Read Success!" << std::endl;
+            // update Read Count since boot variable
+            read_count_since_boot++;
+            // i2c_address = 0x44; // ERROR: Cannot be modifed inside a const method.
+            return 25.3f;
+        }
+
+        int getCount() const{
+            std::cout << "Read Count Since Boot: " << read_count_since_boot << std::endl;
+            return read_count_since_boot;
+        }
+    };
+
+    int main(){
+        std::cout << "========== TOPIC: mutable keyword in C++ ==========" << std::endl;
+
+        // EXAMPLE: Accessing Constant methods & use case of a mutable keyword.
+        TemperatureSensor sensor(0x40);
+        sensor.getCount();
+        for(int i=0; i < 5; i++){
+            sensor.getTemp();
+            sensor.getCount();
+        }
+
+        std::cout << "=========================================" << std::endl;
+        std::cin.get();
+    }
+    ```
+    ```text
+    Output Log:
+    ========== TOPIC: const in C++ ==========
+    1782835800
+    Temperature Sensor Object Instantiated Successfully
+    Read Count Since Boot: 0
+    Temperature Read Success!
+    Read Count Since Boot: 1
+    Temperature Read Success!
+    Read Count Since Boot: 2
+    Temperature Read Success!
+    Read Count Since Boot: 3
+    Temperature Read Success!
+    Read Count Since Boot: 4
+    Temperature Read Success!
+    Read Count Since Boot: 5
+    =========================================
+    ```
+
+## Ternary Operators in C++ (Conditional Assignment)
+- Discussed on Ternary Operators
+- Syntax: `result = condition ? value if true : value if false`
+
+## How to Create/Instantiate Objects in C++
+
