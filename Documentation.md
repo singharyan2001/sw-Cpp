@@ -1152,3 +1152,21 @@ int main(){
 
 - Note: Chapter 3 is completed wrt topic coverage.
 ---
+
+## Member Initializer Lists in C++
+- Constructor member intialization lists is a way for us to initialize our class member functions in the constructor.
+- Discussed Member Initializer lists and hands on implementation of constructor member intializer list, and emphasized on order in the member initializer list.
+- Discussed what happens when Member Initializer are not used vs when they are used.
+
+### Personal Notes
+A Member Initializer List is a syntax used in constructor definitions to initialize class member variables before the constructor body executes. It is placed after the constructor parameter list, starting with `:`.
+
+**Syntax & The "Two-Step" Trap (without vs with)**
+
+To Understand why this feature exists, lets look at what compiler does behind the scene when you initialize a custom object (like a hardware peripheral driver) inside another class.
+
+Scenario A: Wthout Initializer List (The C Style habit)
+
+```cpp
+
+```
