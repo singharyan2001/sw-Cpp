@@ -22,6 +22,7 @@ add_subdirectory(Cpp014_namespace)
 add_subdirectory(Cpp015_error_handling)
 add_subdirectory(Cpp016_member_initializer_list)
 add_subdirectory(Cpp017_const_and_mutable)
+add_subdirectory(Cpp018_object_instantiation)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)

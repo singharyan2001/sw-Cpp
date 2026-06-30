@@ -1407,7 +1407,22 @@ When combining `const` with pointers(`*`), the golden rule of C++ is to read the
     3. `GetX()` (The Name): The Function Name.
     4. `const` (The Method Qualifier): Calling this function will not modify any variables inside the class it belongs to.
 
-<!-- **Const Overloading**  -->
+**Const Overloading** 
+1. You can actually have two functions with the exact same name and arguments, where the only difference is the const keyword at the end.
+2. The compiler is smart enough to pick the correct one based on whether the object is const or not.
+3. E.g.
+    ```cpp
+    class Buffer {
+    private:
+        int data[10];
+    public:
+        // Version 1: For normal objects (Returns writable reference)
+        int& get(int index) { return data[index]; }
+        
+        // Version 2: For const objects (Returns read-only reference)
+        const int& get(int index) const { return data[index]; }
+    };
+    ```
 
 ## The Mutable keyword
 - Discussed on mutable keyword.
@@ -1484,4 +1499,162 @@ When combining `const` with pointers(`*`), the golden rule of C++ is to read the
 - Syntax: `result = condition ? value if true : value if false`
 
 ## How to Create/Instantiate Objects in C++
+- Discussed about instantiating objects and how memory plays a role in this via Stack and Heap memory.
+- Discussed about object instance, stack memory and automatic lifetime.
+- Discussed about object instance, heap memory and dynamic object lifetime.
+- Discussed about the `new` and `delete` keyword.
+- Discussed performance impact, memory consumption, managing object lifetime for stack and heap based memory usage.
+- Sumamry: The Cherno breaks down the differences between stack and heap memory allocation for object creation in C++. Learn when to choose automatic lifespan on the stack versus manual management on the heap, covering performance implications and syntax.
 
+### Personal Notes
+
+In C++, a `class` is just a blueprint. Instantiation is the act of taking that blueprint, asking the OS for memory, and running the constructor to breathe life into the object.
+There are two completely different places in memory you can put an object: the Stack and The Heap.
+
+**The Stack Memory (Automatic Lifetime)**
+1. The Stack is the default, preferred, and fastest way to create an object in C++.
+2. The Syntax: Unlicke Java or C#, you do not use the `new` keyword to create standard objects in C++. you simply declare them like standard variables.
+3. E.g.
+```cpp
+class UartDriver {
+public:
+    UartDriver() { std::cout << "UART Booting...\n"; }
+    ~UartDriver() { std::cout << "UART Shutting down...\n"; }
+    void send() { /* ... */ }
+};
+
+void transmitData() {
+    // 1. Instantiation: Object created on the Stack. Constructor runs IMMEDIATELY.
+    UartDriver myUart; 
+    
+    // 2. Use the object (using the standard dot '.' operator)
+    myUart.send();
+    
+    // 3. The function ends. 
+    // The CPU automatically pops 'myUart' off the stack.
+    // The Destructor (~UartDriver) runs AUTOMATICALLY right here!
+}
+
+int main(){
+    std::cout << "========== Topic: Object Instantiation in C++ ==========" << std::endl;
+
+    // EXAMPLE: Stack Memory based Object Instantiation
+    transmitData();
+    
+    std::cout << "========================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== Topic: Object Instantiation in C++ ==========
+UART Booting...
+Data Sent via UART
+UART Shutting down...
+========================================================
+```
+4. The Firmware Reality of the Stack
+    1. Performace: Blazing fast, Allocating an object on the stack requres a single CPU assembly instruction (moving the stack pointer)
+    2. Memory Management: 100% Automatic, you cannot have a memory leak with a stack object.
+    3. The Danger(Stack Overflow): The Stack is tiny. On a RPI running linux its usually 8MB, on stm32 mcu it might only be 2KB, so if you create a massive object on the stack (e.g. `class ImageBuffer {uint8_t pixels[1000000]; };`), your system will crash.
+
+**The Heap memory (Dynamic Lifetime)**
+1. The Heap is a massive pool of available RAM. You use the Heap when your object is too large to fit on the stack, or when you need the object to survive long after the function that created it has finished.
+2. The Syntax: to put an object on the Heap, you use the `new` keyword. this acts exactly like C's `malloc()`, but automatically calculates the size and forces the constructor to run. Because it's on the Heap, `new` returns a Pointer to the memory address.
+```cpp
+// Object Instantiation in C++
+#include <iostream>
+
+class UartDriver {
+public:
+    UartDriver(){
+        std::cout << "UART Booting..." << std::endl;
+    }
+
+    ~UartDriver(){
+        std::cout << "UART Shutting down..." << std::endl;
+    }
+
+    void send(){
+        std::cout << "Data Sent via UART" << std::endl;
+    }
+};
+
+void transmitData(){
+    // 1. Instantiation: Object created on the Stack. Constructor runs IMMEDIATELY.
+    UartDriver myUart;
+
+    // 2. Use the Object (using the standard dot '.' operator)
+    myUart.send();
+
+    // 3. The function ends.
+    // The CPU automatically pops myUart off the stack.
+    // The Destructor (~UartDriver) runs AUTOMATICALLY right here!
+}
+
+UartDriver* createPersistentDriver(){
+    // 1. Instantiation: Ask for heap memory and run the Constructor
+    UartDriver* heapUart = new UartDriver();
+
+    // 2. Use the object (using the arrow '->' operator because it's a pointer)
+    heapUart->send();
+
+    // 3. the function ends, BUT the object survives!
+    return heapUart;
+}
+
+int main(){
+    std::cout << "========== Topic: Object Instantiation in C++ ==========" << std::endl;
+
+    // EXAMPLE: Stack Memory based Object Instantiation
+    transmitData();
+
+    // EXAMPLE: Heap Memory based Object Instantiation
+    UartDriver* myGlobalDriver = createPersistentDriver();
+    
+    // Use the driver for the entire lifetime of the program
+    for(int i=0; i<10; i++) {
+        myGlobalDriver->send();
+    }
+
+    // Manual Destruction is REQUIRED
+    // if you forget this line, you have a Memory leak.
+    // This frees the memory and runs the Destructor.
+    delete myGlobalDriver;
+    
+    std::cout << "========================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== Topic: Object Instantiation in C++ ==========
+UART Booting...
+Data Sent via UART
+UART Shutting down...
+UART Booting...
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+Data Sent via UART
+UART Shutting down...
+========================================================
+```
+3. the Firmware Reality of the Heap
+    1. Performance: Slow, Calling `new` forces the CPU to search through the Heap looking for a contiguous block of free memory. This takes hundreds of clock cycles.
+    2. The Danger (Fragmentation): In a long-running embedded system (like a drone flying for 40 minutes), repeadly calling `new` and `delete` causes Heap Fragmentation. The Memory gets chopped into tiny, unusable blocks until `new` suddenly fails and the system crashes out of the sky.
+
+**The Golden Rules of Instantiation**
+
+A C++ systems engineer, memorizes these decision tree:
+1. Default to the StackL if you can create the object normally, do it on stack since it is faster, safer, and cleans itself up.
+2. Use the Heap (`new`) ONLY if:
+    1. The Object is incredibly large (e.g. a 10MB network buffer).
+    2. You explicitly need the object's lifetime to outlive the scope `{ }` in which it was created.
