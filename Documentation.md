@@ -1670,3 +1670,84 @@ A C++ systems engineer, memorizes these decision tree:
 - Summary: The Cherno explores the fundamentals of dynamic memory allocation using the `new` keyword to place data on the heap. Learn how to allocate primitive types, arrays, and objects, while understanding the essential relationship between allocating memory and calling constructors in C++.
 
 ### Personal Notes
+In C++, the `new` keyword is the primary operator used to allocate memory on the Heap (dynamic memory) at runtime. Unlike the Stack, where the compiler knows exactly how much memory is needed at compile-time, the Heap is used when you don't know how much memory you need until the program is actually running, or when you need an object to survive beyond the function that created it.
+
+**Syntax and Basic Usage**
+
+You can use `new` to allocate primitive types, arrays, and complex objects. It always returns a Pointer to the newly allocated memory address.
+```cpp
+// New and delete Keywords in C++
+#include <iostream>
+
+class UartDriver {
+public:
+    UartDriver(int baud) {
+        std::cout << "UART Driver Baud rate SET: " << baud << std::endl;
+    }
+    
+    ~UartDriver() {
+        std::cout << "UART Driver Instance will now be destroyed!" << std::endl;
+    }
+};
+
+int main(){
+    std::cout << "========== Topic: NEW and DELETE Keyword in C++ ==========" << std::endl;
+
+    // EXAMPLE: Primitive Types
+    // Allocate exactly 4 bytes on the Heap (for a 32-bit int)
+    int* myInt = new int;
+
+    // Allocates 4 Bytes AND Initializes the value to 42.
+    int* myInitializedInt = new int(42);
+
+    std::cout << "myInt pointer pointing to data: " << *myInt << std::endl;
+    std::cout << "myInitializedInt pointer pointing to data: " << *myInitializedInt << std::endl;
+
+    //Critical Operation: Freeing allocated memory vua delete keyword
+    delete myInt;
+    delete myInitializedInt;
+
+    // EXAMPLE: Arrays (Dynamic Buffers)
+    // Allocates a contiguous block of 400 bytes (100 ints * 4 bytes)
+    int* myBuffer = new int[100];
+    std::cout << "Size of myBuffer Pointer: " << sizeof(myBuffer) << std::endl;
+    int cal_size = 0;
+    for(int i=0; i<100; i++){
+        cal_size += sizeof(*myBuffer);
+    }
+    std::cout << "Size of myBuffer in bytes: " << cal_size << std::endl;
+    //Critical Operation: Freeing allocated memory via delete keyword
+    delete[] myBuffer;
+
+    // EXAMPLE: Custom Objects (Classes)
+    // Allocates memorty AND calls the constructor!
+    UartDriver* myDriver = new UartDriver(115200);
+    delete myDriver;    // Calls the Destructor, then frees memory
+
+    std::cout << "==========================================================" << std::endl;
+    std::cin.get();
+}
+```
+
+**Under the Hood: `new` vs `malloc()`**
+
+Creating an object requires two distinct steps (allocating raw memory + running the constructor). If you try to use C's `malloc()` to create a C++ object, you will get the memory, but the cosntructor will never run. Your object will be full of garbage data and its internal state will be broken.
+
+So when you type the `new` keyword, the C++ compiler secretly translates that into this two step process: Allocate raw, unintialized memory (exaclty what `malloc()` does) , and then call the constuctor on that specific memory address.
+```cpp
+UartDriver* driver = new UartDriver(115200);
+```
+```cpp
+// STEP 1: Allocate raw, uninitialized memory (exactly what malloc does)
+void* rawMemory = operator new(sizeof(UartDriver)); 
+
+// STEP 2: Call the constructor on that specific memory address
+// (You cannot type this in standard code; the compiler does it for you)
+UartDriver* driver = static_cast<UartDriver*>(rawMemory);
+driver->UartDriver::UartDriver(115200); 
+```
+Note: You cannot type this in standard code; the compiler does it for you.
+
+Note: Because `new` is a language operator (not just a library function like `malloc()`), it is fully type-safe, and it automatically calculates `sizeof()` and automatically casts the returning `void*` pointer to the correct type.
+
+**The Performance Penalty**
