@@ -1810,3 +1810,174 @@ UART Driver Baud rate SET: 115200
 This is how modern embedded C++ frameworks (like Mbed OS or Modern C++ HALs) map object oriented classes directly over baremetal silicon registers!.
 
 ## The `this` Keyword in C++
+- Discussed about the `this` keyword and that it is only accessable to us through a member function of a class.
+- `this` keyword is a pointer to the current object instance that the method belongs to.
+- `this` keyword can help to reference any member (data attribute) of that instance/object inside the class code written of that instance.
+- Discussed about `this` and `const` keywords and the relation of `const` with `this`.
+- Discussed about passing the instance as an argument of a function that is defined outside the class but also called and used inside the class in some method or constructor, so to pass the instance itself in that function, we use the `this` keyword to reference itself.
+- Discussed using `this` in const methods of a class.
+- Discussed about using `this` to delete the instance itself.
+
+- **Note:** so my understanding is that by using `this` keyword, you can basically access that very instance of the object to access a variable in that instance, because you might have written a similar argument of a specific non static method in that instance's class code, and therefore `this` keyword would basically be a pointer varaible that holds the address of that current/specific instance that the instance is using via a method of the class/instance.
+- **Note:** so basically `this` keyword is like the `self` that is used in python when we create a class.
+
+- Summary: The Cherno explains how to use the 'this' pointer in C++ to access member variables within a class when parameter names conflict. The tutorial also covers referencing the current object instance and safely passing it to external functions.
+
+### Personal Notes
+
+**Rewritten Quick Notes**
+1. What is it? `this` is a hidden pointer passed into every non-static member function of a class. It holds the memory address of the specific object instance that called the function.
+2. Scope: It is only accessable from inside the member fucntions of a class.
+3. Name Disambiguation: Its most commin basic use is to differentiate between a class mmber variable and a function parameter that have exact same name (e.g. `this->x = x;`).
+4. Self-Referencing: It allows an object to pass a pointer or reference of itself to outside external functions or hardware callbacks.
+5. The `const` interaction: If a method is marked `const`, the `this` pointer changes from `Entity*` to `const Entity*`. this is the literal mechanism that prevents you from modifying variables inside a `const` method.
+6. Memory Management: An object can technically call `delete this;` to destroy itself, though this is a highly dangerous pattern reserved for specific memory-management architectures.
+
+**The C to C++" Reality (How it actually works)**
+
+Because you are a C programmer, the easiest way to understand `this` is to look at what the C++ compiler is secretly doing to your code behind the scenes.
+In C, functions don't belong to structs. If you want a function to modify a struct, you have to pass a pointer to that struct as the first argument:
+1. The C Way:
+    ```cpp
+    struct Sensor {
+        int pin;
+    };
+
+    // You manually pass the pointer to the struct
+    void Sensor_SetPin(struct Sensor* ptr, int p) {
+        ptr->pin = p;
+    }
+
+    int main() {
+        struct Sensor mySensor;
+        Sensor_SetPin(&mySensor, 5);
+    }
+    ```
+    ```text
+    Output Log:
+    ========== Topic: this Keyword in C++ ==========
+    C Style Example
+    Sensor Pin SET Value: 5
+    ================================================
+    ```
+2. The C++ Way:
+    ```cpp
+    class Sensor {
+    private:
+        int pin;
+    public:
+        void setPin(int p) {
+            // 'this' is magically available here!
+            this->pin = p; 
+        }
+    };
+
+    int main() {
+        Sensor mySensor;
+        mySensor.setPin(5); 
+        // ^ The compiler secretly translates this into: Sensor::setPin(&mySensor, 5);
+    }
+    ```
+    ```text
+    ========== Topic: this Keyword in C++ ==========
+    C Style Example
+    Sensor Pin SET Value: 5
+    [CONSTRUCTOR] SENSOR INSTANCE INITIALIZED WITH DEFAULT PIN 1
+    [CONSTRUCTOR] SENSOR INSTANCE INITIALIZED WITH DEFAULT PIN 5
+    NEW PINS SET: 5
+    NEW PINS SET: 9
+    ================================================
+    ```
+
+**Practical Use Cases**
+
+1. **Name Shadowing (Solving Naming conflicts):** When your constructor argument has the same name as your class variable, the compiler gets confused. this-> tells the compiler exactly which one is the class variable.
+    ```cpp
+    class UartDriver {
+    private:
+        int baud_rate;
+    public:
+        // The parameter is also named 'baud_rate'
+        UartDriver(int baud_rate) {
+            // baud_rate = baud_rate; // WRONG! Just assigns the parameter to itself.
+            
+            this->baud_rate = baud_rate; // CORRECT! Assigns parameter to the object.
+        }
+    };
+    ```
+2. **Passing "Self" to External Functions (Hardware Callbacks):** In embedded systems, you often have a global hardware interrupt, but you want it to trigger a function inside your specific object. You can use `this` to register your object with the global system.
+```cpp
+// USE CASE: Passing "self" to external functions (Hardware callbacks)
+// A global function
+void register_sensor_callback(class SensorY* s);
+
+class SensorY {
+public:
+    void init(){
+        // Hey Global System, register ME!
+        register_sensor_callback(this);
+    }
+
+    void onHardwareInterrupt(){
+        std::cout << "ISR TRIGGERED & PROCESSED" << std::endl;
+    }
+};
+
+int main() {}
+
+void register_sensor_callback(class SensorY* s){
+    s->onHardwareInterrupt();
+}
+```
+3. **Returning References to Self (Method Chaining):** If you return `*this` (dereferencing the pointer to get the actual object), you can chain methods together. This is how `std::cout << "A" << "B";` works!
+```cpp
+// USE CASE: Returning References to Self (Method Chaining)
+class LedController {
+public:
+    LedController& turnOn(){
+        std::cout << "LED TURNED ON!" << std::endl;
+        return *this;   // return the object itself
+    }
+
+    LedController& setBrightness(int level){
+        std::cout << "LED BRIGHTNESS SET: " << level << std::endl;
+        return *this;
+    }
+};
+```
+```text
+Output Log:
+========== Topic: this Keyword in C++ ==========
+ISR TRIGGERED & PROCESSED
+LED TURNED ON!
+LED BRIGHTNESS SET: 100
+================================================
+```
+
+**The Danger Zone: `delete this;`**
+```cpp
+class TemporaryTask {
+public:
+    TemporaryTask(){
+        std::cout << "TASK CREATED - NOW RUNNING" << std::endl;
+    }
+    void finishTask() {
+        // ... do work ...
+        
+        // Destroy myself!
+        delete this; 
+    }
+};
+```
+```text
+========== Topic: this Keyword in C++ ==========
+EXAMPLE: Using delete and this keyword to destroy an object - NOT RECOMMENDED!!
+TASK CREATED - NOW RUNNING
+munmap_chunk(): invalid pointer
+Aborted (core dumped)
+```
+
+**Firmware Warning:** You should almost never do this.
+1. It only works if the object was created on the Heap using `new`. If the object was created on the Stack and calls `delete this;`, your entire program will instantly crash.
+2. If you call `delete this;` and then try to read a member variable on the very next line, you are reading freed memory (Undefined Behavior). It is occasionally used in advanced UI frameworks or reference-counted smart pointers, but it should be avoided in standard systems programming.
+
