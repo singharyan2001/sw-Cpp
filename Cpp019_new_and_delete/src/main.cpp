@@ -1,5 +1,6 @@
 // New and delete Keywords in C++
 #include <iostream>
+#include <new>
 
 class UartDriver {
 public:
@@ -45,6 +46,17 @@ int main(){
     // Allocates memorty AND calls the constructor!
     UartDriver* myDriver = new UartDriver(115200);
     delete myDriver;    // Calls the Destructor, then frees memory
+
+    // EXAMPLE: Placement New example for firmware based implementation
+    // Imagine 0x40004400 is the hardcoded memory address of the USART2 Peripheral
+    std::cout << "Advanced firmware Implementation Example using Placement New in C++" << std::endl;
+    
+    void* hardware_register_address = (void*)0x40004400;
+
+    // Tell C++: "Don't allocate memory. just run the UartDriver constructor directly in tip of this exact memory address"
+    UartDriver* usart2 = new (hardware_register_address) UartDriver(115200);
+
+    // NoteL you NEVER call delete on an object created with placement New, because you didn't allocate the memory from the Heap!
 
     std::cout << "==========================================================" << std::endl;
     std::cin.get();

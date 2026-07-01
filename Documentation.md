@@ -1751,3 +1751,62 @@ Note: You cannot type this in standard code; the compiler does it for you.
 Note: Because `new` is a language operator (not just a library function like `malloc()`), it is fully type-safe, and it automatically calculates `sizeof()` and automatically casts the returning `void*` pointer to the correct type.
 
 **The Performance Penalty**
+
+The Cherno emphasizes that `new` is slow. when you allocate on the stack, the CPU simply subtracts a value from the Stack Pointer Register and It takes exactly 1 clock cycle.
+
+When you call `new`, you are asking the OS for a favor.
+1. **Context Switch:** The Program pauses and hands control to the OS Kernel.
+2. **Free List Travesal:** The OS Memory manager searches a massive linked list (The "Free List") looking for a contiguous block of RAM that is large enough to fit your object.
+3. **Fragmentation:** If your Heap is highly fragmented (lots of tiny allocation and deletion), this search can take hundreds or thousands of clock cycle.
+4. **BookKeeping:** The OS records the size of your allocation in a hidden header right before your pointer, so it knows how much to free when you call `delete`.
+
+Firmware Takeaway: Never call `new` inside a high speed control loop or hardware interrupt (ISR). Allocate all your necessary objects using `new` once during the system boot-up phase, and then reuse them.
+
+**Advanced Firmware Secret: "Placement New"**
+
+Scenario: What if you want to run a C++ Constructor, but you don't want to use the Heap? what if you want to construct an object ar a specific hardcoded memory address (like a memory-mapped hardware register)?
+
+C++ allows a specialized syntax called Placement New. It bypasses Step 1 (memory allocation) and only performs Step 2 (calling the constructor at a provided address).
+```cpp
+#include <iostream>
+#include <new>
+
+class UartDriver {
+public:
+    UartDriver(int baud) {
+        std::cout << "UART Driver Baud rate SET: " << baud << std::endl;
+    }
+    
+    ~UartDriver() {
+        std::cout << "UART Driver Instance will now be destroyed!" << std::endl;
+    }
+};
+
+int main(){
+    std::cout << "========== Topic: NEW and DELETE Keyword in C++ ==========" << std::endl;
+
+    // EXAMPLE: Placement New example for firmware based implementation
+    // Imagine 0x40004400 is the hardcoded memory address of the USART2 Peripheral
+    std::cout << "Advanced firmware Implementation Example using Placement New in C++" << std::endl;
+    
+    void* hardware_register_address = (void*)0x40004400;
+
+    // Tell C++: "Don't allocate memory. just run the UartDriver constructor directly in tip of this exact memory address"
+    UartDriver* usart2 = new (hardware_register_address) UartDriver(115200);
+
+    // NoteL you NEVER call delete on an object created with placement New, because you didn't allocate the memory from the Heap!
+
+    std::cout << "==========================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== Topic: NEW and DELETE Keyword in C++ ==========
+Advanced firmware Implementation Example using Placement New in C++
+UART Driver Baud rate SET: 115200
+==========================================================
+```
+This is how modern embedded C++ frameworks (like Mbed OS or Modern C++ HALs) map object oriented classes directly over baremetal silicon registers!.
+
+## The `this` Keyword in C++
