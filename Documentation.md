@@ -2292,3 +2292,77 @@ The Golden rule: Only overload an operator if the mathematical meaning is univer
 
 If the action is complex, just write a well-named function like `uart1.bridgeWith(uart2);`. Save operator overloading purely for mathematical or data-holding structs.
 
+## Concrete type in C++ (Reference textbook >> ch4:4.2)
+- A Concrete Type is a custom class that behaves exactly like a built-in primitive type (like `int` or `float`)
+- The Characteristics of a concrete type are:
+    - Its representation is fully known, the compiler knows exactly how much memory it takes up at compile time.
+    - it can be placed on the stack, and you don't need `new` or the heap to create it.
+    - It can be copied and assigned if you do `a=b`, you get two completely independent objects with identical data.
+    - No Inheritance or Virtual functions: Concrete types do not use the `virtual` keyword, as they are not meant to be base classes.
+- Examples of concrete types in the standard library: `std::string`, `std::vector`, `std::complex`.
+- To increase flexibility, a concrete type can keep major parts of its representation in the free sote (dynamic memory, heap) and access them through the part stored in the class object itself, that's the way `vector` and `string` are implemented as they can be considered resource handles with carefully crafted interfaces.
+- Implementation of Concrete Types - Since concrete types act like primitive, they use **Value Semantics**. You pass them around directly, you copy them, and you overload math operators so they "feel" like normal numbers.
+```cpp
+class ComplexNumber {
+private:
+public:
+    double real, imag;
+    // 1. Fully initalizes the objects
+    ComplexNumber(double r, double i) : real(r) , imag(i) {}
+
+    // 2. operator Overloading makes it feel like an `int`
+    ComplexNumber operator+(const ComplexNumber& other) const {
+        return ComplexNumber(real + other.real, imag + other.imag);
+    }
+
+    bool operator==(const ComplexNumber& other) const {
+        return (real == other.real) && (imag == other.imag);
+    }
+
+    bool operator!=(const ComplexNumber& other) const {
+        return !(*this == other);
+    }
+};
+
+// Global Operator Overloading for printing my complex number concrete class
+std::ostream& operator<<(std::ostream& stream, const ComplexNumber& cn){
+    stream << "real: " << cn.real << " , " << "imag: " << cn.imag;
+    return stream;
+}
+
+int main(){
+    std::cout << "========== TOPIC: COMPLEX NUMBERS IN C++ ==========" << std::endl;
+
+    // Look how it behaves exactly like an `int`!
+    ComplexNumber a(1.0, 2.0);  // Placed on the stack
+    ComplexNumber b(3.0, 4.0);
+
+    ComplexNumber c = a + b;
+    std::cout << "Complex Number C: " << c << std::endl;
+
+    if(a == b){
+        std::cout << "A == B ?? >> TRUE" << std::endl;
+    }
+    else{
+        std::cout << "A == B ?? >> FALSE" << std::endl;
+    }
+
+    if(b != c){
+        std::cout << "B != C ?? >> TRUE" << std::endl;
+    }
+    else{
+        std::cout << "B != C ?? >> FALSE" << std::endl;
+    }
+
+    std::cout << "===================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output log
+========== TOPIC: COMPLEX NUMBERS IN C++ ==========
+Complex Number C: real: 4 , imag: 6
+A == B ?? >> FALSE
+B != C ?? >> TRUE
+===================================================
+```
