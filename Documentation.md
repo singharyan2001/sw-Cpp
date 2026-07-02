@@ -1981,3 +1981,104 @@ Aborted (core dumped)
 1. It only works if the object was created on the Heap using `new`. If the object was created on the Stack and calls `delete this;`, your entire program will instantly crash.
 2. If you call `delete this;` and then try to read a member variable on the very next line, you are reading freed memory (Undefined Behavior). It is occasionally used in advanced UI frameworks or reference-counted smart pointers, but it should be avoided in standard systems programming.
 
+## Implicit Conversion/Constructor and the Explicit Keyword in C++
+- Discussed about Implicit conversion and constructor.
+- Discussed about Explicit Keyword and how it prevents automatic implicit conversion by the compiler.
+- Summary: The Cherno demonstrates how the C++ compiler automatically performs one implicit type conversion and explains how to prevent this behavior. The tutorial covers creating a class and using constructors to see these conversions in action, while discussing the impact of the explicit keyword on code clarity and safety.
+
+### Personal Notes
+1. Implicit conversion in C++, allows the compiler to automatically convert one data type into another. If a class has a constructor that takes a single argument, the compiler can secretly use that constructor to convert that argument into an object of the class.
+2. The One step limit basically means that the C++ compiler is only allowed to perform one implicit conversion at a time. It cannot chain multiple implicit conversions together to make types match.
+3. The Danger is that due to this automatic behavior, it can lead to accidental object instantiation, causing silent logic bugs and wasting CPU cycles in unncessary memory allocation.
+4. The `Explicit` keyword placed before a constructor can disable implicit conversion. It forces the programmer to explicitily call the constructor by name if they want to create an object, resulting in safet and more readable code.
+
+**How Implicit Conversion Works**
+
+Imagine you have a class that represents a hardware GPIO pin and it has a constructor that takes a single integer (the pin number).
+```cpp
+class GpioPin {
+private:
+    int pin_number;
+public:
+    // A constructor that takes one integer
+    GpioPin(int pin) : pin_number(pin) {
+        // Init hardware pin...
+        std::cout << "GPIO PIN INTIALIZED" << std::endl;
+    }
+};
+
+void togglePin(const GpioPin& p) {
+    // Toggles the hardware state
+    std::cout << "GPIO PIN SET: " << p << std::endl;
+}
+```
+Because the constructor takes a single `int`, C++ creates a hidden rule: "An `int` can now be automatically converted into a `GpioPin`. This means that you can do this in your `main()` function:
+```cpp
+int main(){
+    // Normal instantiation
+    GpioPin myLed(5); 
+    
+    // IMPLICIT CONVERSION! 
+    // We are passing an 'int' (13) to a function expecting a 'GpioPin' object.
+    togglePin(13); 
+    
+    return 0;
+}
+```
+What the compiler secretly did: It saw `13`, realized `togglePin` needed a `GpioPin`, and silently rewrote your code to `togglePin(GpioPin(13));`. It created a temporary object on the stack without you ever typing the class name.
+
+**The Danger in Firmware**
+
+While typing `togglePin(13)` looks convenient, implicit conversions cause catastrophic bugs when types get mixed up. Consider a custom `String` class and a `Buffer` class:
+```cpp
+class Buffer {
+public:
+    // Constructor allocates 'size' bytes on the Heap
+    Buffer(int size) { 
+        std::cout << "BUFFER CREATED & INTIALIZED WITH SIZE: " << size << std::endl;
+    }
+};
+
+void sendData(const Buffer& b) {
+    // Transmits buffer over UART...
+    std::cout << "SENDING DATA: " << b << std::endl;
+}
+
+int main() {
+    int sensor_value = 255;
+    
+    // BUG! The programmer meant to send the NUMBER 255.
+    // But because of implicit conversion, the compiler silently creates 
+    // an empty Buffer of size 255 bytes and sends that instead!
+    sendData(sensor_value); 
+}
+```
+The code compiles perfectly, no errors are thrown, but your system behavior is completely broken.
+
+**The Fix: The explicit Keyword**
+
+To prevent the compiler from making dangerous assumptions, you add the explicit keyword in front of any constructor that takes a single argument. This revokes the compiler's permission to use the constructor behind your back.
+```cpp
+class Buffer {
+public:
+    // We added the explicit keyword!
+    explicit Buffer(int size) { /* ... */ } 
+};
+
+void sendData(const Buffer& b) { /* ... */ }
+
+int main() {
+    int sensor_value = 255;
+    
+    // COMPILER ERROR! Cannot convert 'int' to 'Buffer'.
+    // sendData(sensor_value); 
+    
+    // SUCCESS: If you actually want a buffer of size 255, 
+    // you must clearly ask for it.
+    sendData(Buffer(sensor_value)); 
+}
+```
+
+The Golden Rule for Modern C++ is always mark single-argument constructors as explicit unless you have a highly specific, intentional reason to allow implicit conversions. In embedded systems and complex architectures like gRPC, you want the code to do exactly what you type, nothing more and nothing less.
+
+## Operators & Operator Overloading
