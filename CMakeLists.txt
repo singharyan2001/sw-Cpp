@@ -25,6 +25,7 @@ add_subdirectory(Cpp017_const_and_mutable)
 add_subdirectory(Cpp018_object_instantiation)
 add_subdirectory(Cpp019_new_and_delete)
 add_subdirectory(Cpp020_this_keyword)
+add_subdirectory(Cpp021_operators_and_operator_overloading)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)

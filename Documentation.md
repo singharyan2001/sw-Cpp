@@ -2082,3 +2082,6 @@ int main() {
 The Golden Rule for Modern C++ is always mark single-argument constructors as explicit unless you have a highly specific, intentional reason to allow implicit conversions. In embedded systems and complex architectures like gRPC, you want the code to do exactly what you type, nothing more and nothing less.
 
 ## Operators & Operator Overloading
+- Discussed overview of operators in C++
+- Discussed operator overloading
+- Showcased examples of operator overloading with structs and classes.
