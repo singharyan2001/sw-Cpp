@@ -2085,3 +2085,210 @@ The Golden Rule for Modern C++ is always mark single-argument constructors as ex
 - Discussed overview of operators in C++
 - Discussed operator overloading
 - Showcased examples of operator overloading with structs and classes.
+- showcased examples on why operator oveloading can help make code more readable with +,-,* based operator overloading example.
+- Discussed and showcase example on left shift operator with operator overloading.
+- Summary: The Cherno demonstrates how to implement operator overloading by defining custom behaviors for mathematical symbols using a vector struct. The tutorial covers creating addition, multiplication, and equality operators to streamline code readability and functionality.
+
+### Personal Notes
+
+In C++, an operator(`+`,`-`,`*`,`==`,`<<`) is just a function with a special name. Operator Overloading allows you to define what these symbols do when applied to your custom `struct` or `class`.
+
+**The Core Syntax(Math Operators)**
+
+When you type `a+b`, the C++ compiler actually translates this into a function call: `a.operator+(b)`. If you want to allow two drone coordinate vectors to be added together, you just write a method named `operator+`.
+```cpp
+// Operators and Operator Overloading in C++
+#include <iostream>
+
+struct Vector3 {
+    float x,y,z;
+    Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
+
+    // The Overloaded `+` Operator
+    // Notice the const reference (fast, safe) and the trailing const (read-only)
+    Vector3 operator+(const Vector3& other) const {
+        // Return a brand new Vector3 Object with the added values
+        return Vector3(x + other.x, y + other.y, z + other.z);
+    }
+
+    // The Overloaded '*' Operator (Scaling by a scalar value)
+    Vector3 operator*(float scalar) const {
+        return Vector3(x * scalar, y * scalar, z * scalar);
+    }
+};
+
+
+int main(){
+    std::cout << "========== TOPIC: Operators and Operator Overloading ==========" << std::endl;
+
+    Vector3 position(10.0f, 10.0f, 5.0f);
+    Vector3 velocity(1.0f, 2.0f, 0.0f);
+    std::cout << "Position Vector Values (x,y,z): " << position.x << "," << position.y << "," << position.z << std::endl;
+    std::cout << "Velocity Vector Values (x,y,z): " << velocity.x << "," << velocity.y << "," << velocity.z << std::endl;
+
+    // Beautiful, readale C++ code!
+    Vector3 next_position = position + velocity;
+    std::cout << "New Position Vector Values (x,y,z): " << next_position.x << "," << next_position.y << "," << next_position.z << std::endl;
+
+    // Scaling the vector
+    Vector3 fast_velocity = velocity * 2.0f;
+    std::cout << "New Velocity Vector Values (x,y,z): " << fast_velocity.x << "," << fast_velocity.y << "," << fast_velocity.z << std::endl;
+
+    std::cout << "===============================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== TOPIC: Operators and Operator Overloading ==========
+Position Vector Values (x,y,z): 10,10,5
+Velocity Vector Values (x,y,z): 1,2,0
+New Position Vector Values (x,y,z): 11,12,5
+New Velocity Vector Values (x,y,z): 2,4,0
+===============================================================
+```
+
+**The Equality Operator (==)**
+
+In C, comparing two structs requires `memcmp()` or manually comparing every single variable inside an `if` statement.
+In C++, you can overload the `==` operator so your objects can be compared just like basic integers.
+```cpp
+// Operators and Operator Overloading in C++
+#include <iostream>
+
+struct Vector3 {
+    float x,y,z;
+    Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
+
+    // The Overloaded `+` Operator
+    // Notice the const reference (fast, safe) and the trailing const (read-only)
+    Vector3 operator+(const Vector3& other) const {
+        // Return a brand new Vector3 Object with the added values
+        return Vector3(x + other.x, y + other.y, z + other.z);
+    }
+
+    // The Overloaded '*' Operator (Scaling by a scalar value)
+    Vector3 operator*(float scalar) const {
+        return Vector3(x * scalar, y * scalar, z * scalar);
+    }
+};
+
+// EXAMPLE: The Equality Operator (==)
+struct SensorConfig {
+    int baud_rate;
+    int pin_tx;
+    int pin_rx;
+    
+    // Overloading the '==' operator
+    bool operator==(const SensorConfig& other) const{
+        return (baud_rate == other.baud_rate) && (pin_tx == other.pin_tx) && (pin_rx == other.pin_rx);
+    }
+    
+    // It's good practice to also overload '!=' when you overload '=='
+    bool operator!=(const SensorConfig& other) const{
+        return !(*this == other); // Reuse the '==' logic using the 'this' pointer!
+    }
+};
+
+int main(){
+    std::cout << "========== TOPIC: Operators and Operator Overloading ==========" << std::endl;
+
+    std::cout << "EXAMPLE: The Equality Operator \'==\' operator overloading" << std::endl;
+    SensorConfig current_config = {115200, 4, 5};
+    SensorConfig gps_config = {9600, 4, 5};
+    SensorConfig rain_sensor_config = {115200, 4, 5};
+
+    if(current_config == rain_sensor_config){
+        std::cout << "SUCCESS: current config == rain sensor config" << std::endl;
+    }
+    else{
+        std::cout << "FAILED: current config != rain sensor config" << std::endl;
+    }
+
+    if(current_config != gps_config){
+        std::cout << "SUCCESS: current config != gps config" << std::endl;
+    }
+    else{
+        std::cout << "FAILED: current config == gps config" << std::endl;
+    }
+
+    std::cout << "===============================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== TOPIC: Operators and Operator Overloading ==========
+EXAMPLE: The Equality Operator '==' operator overloading
+SUCCESS: current config == rain sensor config
+SUCCESS: current config != gps config
+===============================================================
+```
+
+**The Left Shift Operator (<<) and std::cout**
+
+In C, `<<` strictly means bitwise shifting (e.g. `1<<3`).
+The creators of C++ overloaded the `<<` operator for the `std::cout` object so that it acts as a "stream insertion" operator. You can teach `std::cout` how to print your custom objects!.
+
+Unlike `+` or `==`, this operator must be defined outside of your class, because you don't own the `std::ostream` class to add methods to it.
+```cpp
+// Operators and Operator Overloading in C++
+#include <iostream>
+
+// EXAMPLE: The Core Syntax (Math Operators)
+struct Vector3 {
+    float x,y,z;
+    Vector3(float x, float y, float z) : x(x), y(y), z(z) {}
+
+    // The Overloaded `+` Operator
+    // Notice the const reference (fast, safe) and the trailing const (read-only)
+    Vector3 operator+(const Vector3& other) const {
+        // Return a brand new Vector3 Object with the added values
+        return Vector3(x + other.x, y + other.y, z + other.z);
+    }
+
+    // The Overloaded '*' Operator (Scaling by a scalar value)
+    Vector3 operator*(float scalar) const {
+        return Vector3(x * scalar, y * scalar, z * scalar);
+    }
+};
+
+// EXAMPLE: The Left Shift Operator (<<) and std::cout
+// Global Operator Overload
+std::ostream& operator<<(std::ostream& stream, const Vector3& v){
+    stream << "X: " << v.x << ", Y: " << v.y << ", Z: " << v.z;
+    // We return the stream so we can chain it!! (e.g. cout << v1 << v2;)
+    return stream;
+}
+
+
+int main(){
+    std::cout << "========== TOPIC: Operators and Operator Overloading ==========" << std::endl;
+
+    std::cout << "EXAMPLE: The Left Shift \'<<\' operator overloading with cout" << std::endl;
+    Vector3 drone_pos(14.5f, 9.2f, 100.0f);
+    // std::cout now knows exactly how to print a Vector3!
+    std::cout << "Drone Location: " << drone_pos << std::endl;
+
+    std::cout << "===============================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== TOPIC: Operators and Operator Overloading ==========
+EXAMPLE: The Left Shift '<<' operator overloading with cout
+Drone Location: X: 14.5, Y: 9.2, Z: 100
+===============================================================
+```
+
+**The Firmware Design Consideration**
+
+Operator overloading is incredibly powerful, but it can make code confusing if abused.
+
+The Golden rule: Only overload an operator if the mathematical meaning is universal obvious.
+- Overloading `+` for `Vector3` or `Matrix` makes perfect sense.
+- Overloading `+` for a `RingBuffer` or a `UartDriver` is confusing, like for example what does `uart1`+`uart2` actually mean?? does it combine the data? or does it bridge the hardware?
+
+If the action is complex, just write a well-named function like `uart1.bridgeWith(uart2);`. Save operator overloading purely for mathematical or data-holding structs.
+
