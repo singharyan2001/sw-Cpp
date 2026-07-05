@@ -2366,3 +2366,174 @@ A == B ?? >> FALSE
 B != C ?? >> TRUE
 ===================================================
 ```
+
+**Concrete Types vs Abstract types**
+
+To understand Concrete Types, you must compare them to abstract types:
+
+| Feature | Concrete Type | Abstract Type |
+|:--------|:--------------|:--------------|
+| Memory Size | Known exactly at compile time. | Unknown (depends on the derived class) |
+| Instantiation | Placed directly on the stack `Vector3 v;` | Must be accessed via Pointers/References (`Isensor* s;`) |
+| Performance | Blazing fast (No VTable, easily inlined by compiler) | Slower (Requires dynamic dispatch/VTable lookup). |
+| Use Case | Data holders, math concepts, wrappers | Hardware abstraction, system architecture |
+
+**Struct vs Class (The C++ Core Guidelines)**
+
+When building concrete types, you have to choose whether to type `struct` or `class`. In C++, the only technical difference is that `struct` members are `public` by default, and `class` members are `private` by default.
+However, the C++ Core Guidelines give a strict philosophical rule for when to use which:
+1. Use `struct` of the data members can vary independently. (e.g. An `x` and `y` coordinate. `x` can be 5 while `y` is 100. they dont relt on each other).
+2. Use `class` if the type has an Invariant. An Invariant is a rule that must be true. (e.g., A `date` class, the `day` cannot be 31 if the `month` is february. Because the data relies on rules, you must use a `class`, make the data `private`, and force the user to go through a constructor that checks those rules).
+
+**Containers as Concrete Types (RAII)**
+
+A Container is an object holding a collection of elements. Stroustrup introduces a custom `Vector` class to demonstrate that a concrete type can manage dynamic heap memory in the background, while still looking and acting like a simple stack variable to the user.
+
+This relies on a concept called Resource Aquisition Is Initialization [RAII]:
+- The Constructor aquires the memory (using `new` or `new[]`)
+- The Destructor releases the memory (using `delete` or `delete[]`)
+
+```cpp
+// Concrete types in C++
+#include <iostream>
+
+// Containners as Concrete Types
+class Vector {
+private:
+    double* elem;   // Pointer to heap memory
+    int sz;         // Number of elements
+public:
+    // Constructor acquires resources
+    Vector(int s) : elem(new double[s]), sz(s) {
+        for(int i = 0; i != s; i++){
+            elem[i] = 0;    // Intialize to zero
+        }
+        std::cout << "[CONSTRUCTOR] Vector Object Instantiated and Intialized to Zero" << std::endl;
+    }
+
+    // Destructor releases resources automatically!
+    ~Vector(){
+        delete[] elem;
+        std::cout << "[DESTRUCTOR] Vector \'elem\' will be destroued and memory will be freed!" << std::endl;
+    }
+
+    // Operator Overloading allows array-style access
+    double& operator[](int i) {
+        return elem[i];
+    }
+
+    int size() const {
+        return sz;
+    }
+};
+
+int main(){
+    std::cout << "========== TOPIC: COMPLEX NUMBERS IN C++ ==========" << std::endl;
+
+    Vector v(10);
+    v[1] = 7;
+
+    // when 'v' goes out of scope i.e. program ends, the Destructor (~Vector()) is called and it automatically frees memory.
+
+    std::cout << "===================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+output Log:
+========== TOPIC: COMPLEX NUMBERS IN C++ ==========
+[CONSTRUCTOR] Vector Object Instantiated and Intialized to Zero
+===================================================
+
+[DESTRUCTOR] Vector 'elem' will be destroued and memory will be freed!
+```
+
+**Initializing Containers (srd::initializer_list)**
+
+In C, if you want an array with specific values, you use brace intialization: `int arr[] = {1,2,3,4,5};`. Because you Vector is a Concrete Type (it acts as a primitive), you want users to be able to initialize it the exact same way.
+C++ provides a special type called `std::initializer_list` to capture those curly braces and pass them to your constructor.
+
+A Container exists to hold elements, so we need convient ways of getting elements into the container, and we can handle that by creating a `Vector` with an appropriate number of elements and then assigning to them,  but there are other more elegant ways such as: Initializer-list constructor (initialize with a list of elements) or a push back based api that adds a new element at the end or at the back of the sequence.
+
+```cpp
+// Concrete types in C++
+#include <iostream>
+#include <initializer_list>
+
+// Containners as Concrete Types
+class Vector {
+private:
+    double* elem;   // Pointer to heap memory
+    int sz;         // Number of elements
+public:
+    // Constructor acquires resources
+    Vector(int s) : elem(new double[s]), sz(s) {
+        for(int i = 0; i != s; i++){
+            elem[i] = 0;    // Intialize to zero
+        }
+        std::cout << "[CONSTRUCTOR] Vector Object Instantiated and Intialized to Zero" << std::endl;
+    }
+
+    // Initializer-list constructor - for intializing the container with a list of elements.
+    Vector(std::initializer_list<double> lst)
+        : elem{new double[lst.size()]}, sz{static_cast<int>(lst.size())}
+    {
+        // Copy the elements from the brace list into our heap memory
+        std::copy(lst.begin(), lst.end(), elem);
+        std::cout << "[CONSTRUCTOR] Vector Object Instantiated and initialized with element list shared" << std::endl;
+    }
+
+    // Destructor releases resources automatically!
+    ~Vector(){
+        delete[] elem;
+        std::cout << "[DESTRUCTOR] Vector \'elem\' will be destroued and memory will be freed!" << std::endl;
+    }
+
+    // Operator Overloading allows array-style access
+    double& operator[](int i) {
+        return elem[i];
+    }
+
+    int size() const {
+        return sz;
+    }
+};
+
+int main(){
+    std::cout << "========== TOPIC: COMPLEX NUMBERS IN C++ ==========" << std::endl;
+
+    // Using the initializer_list constructor!
+    // Beautiful, clean, C-style syntax, but completely memory-safe.
+    Vector mySensorData = {24.5, 25.1, 26.8, 23.9};
+
+    std::cout << "Read index 2: " << mySensorData[2] << std::endl;
+
+    std::cout << "===================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== TOPIC: COMPLEX NUMBERS IN C++ ==========
+[CONSTRUCTOR] Vector Object Instantiated and initialized with element list shared
+Read index 2: 26.8
+===================================================
+
+[DESTRUCTOR] Vector 'elem' will be destroyed and memory will be freed!
+```
+
+Firmware Use Case: This `std::initializer_list` syntax is fantastic for intializing hardware configurations. for e.g., if you build a `Spitransaction` class, you can allow the user to type `SpiTransaction tx = {0xFF, 0x01, 0x00, 0xAA};` to build the transmission payload in one clean line of code!
+
+## Abstract type in C++ (Reference textbook >> ch4:4.3)
+
+An Abstract Type is a class that completely insulates a user from implementation details. In C++, an Interface isn't a special keyword. An interface is simply an abstract type where ar least one virtual function is set to `=0`. We call this an Abstract Class.
+
+Note: Abstract class type topics i.e. pure virtual functions/interfaces, and virtual & override keyword in C++ have been covered above.
+
+1. A Class thatprovides the interface to a varity of other classes is opten called polymorphic type.
+2. `Class Vecotr_container : public Container {}` , The `:public` can be read as "is defined from" or "is a subtype of".
+3. `Vector_container` is said to be derived from class `Container`, and class `Container` is sad to be a base of class `Vectr_container`. Alternative terminology calls `Vector_container` and `Container` - subclass and superclass.
+4. The derived class is said to inherit members from its base class, so the use of base and derived classes is commonly referred as inheritance.
+
+## Class Hierarchies (ch4:4.5)
+This topic covers an intro to class hierarchies and topics such as virtual, override, virtual destructor, vTable, Explicit Overriding of functions in a derived class.
