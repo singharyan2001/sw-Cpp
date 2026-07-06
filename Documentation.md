@@ -2537,3 +2537,7 @@ Note: Abstract class type topics i.e. pure virtual functions/interfaces, and vir
 
 ## Class Hierarchies (ch4:4.5)
 This topic covers an intro to class hierarchies and topics such as virtual, override, virtual destructor, vTable, Explicit Overriding of functions in a derived class.
+
+A Class hierarchy offers two kinds of benefits:
+1. Interface Inheritance: An Object of a derived class can be used wherever an object of a base class is required. That is, the base class acts as an interface for the derived class.
+2. Implementation Inheritance: A Base class provides functions or data that simplifies the implementation of derived classes.
