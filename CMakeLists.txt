@@ -30,3 +30,4 @@ add_subdirectory(Cpp022_concrete_types)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)
+add_subdirectory(Mini-Projects/MP003_polymorphic_sensor_hal)
