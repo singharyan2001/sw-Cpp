@@ -28,6 +28,7 @@ add_subdirectory(Cpp020_this_keyword)
 add_subdirectory(Cpp021_operators_and_operator_overloading)
 add_subdirectory(Cpp022_concrete_types)
 add_subdirectory(Cpp023_arrays)
+add_subdirectory(Cpp024_strings)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)
