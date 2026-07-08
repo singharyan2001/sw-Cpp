@@ -2822,3 +2822,72 @@ const char* rawPtr = text.c_str(); // Returns the underlying const char* null-te
 - Discussed about memory of string literals.
 - Discussed the assembly generated code - which describes how the `name` variable storing a string literal is copied from RAM to the name variable.
 - Summary: The Cherno explores how character arrays are stored in memory and explains the critical role of the null termination character. The session covers compiler settings for viewing assembly output and differences between char, wchar_t, and modern UTF types.
+
+### Personal Notes:
+A String is a hardcoded string characters written directly inside double quotes in your source code such as "Hello, World!".
+
+#### The Hardware Reality: Where do Literals Live?
+- Unlike normal local variables that are created dynamically on the Stack, or dynamic memory allocated on the Heap, string literals are baked directly into your application's binary.
+- When your program is compiled, all string literals are placed in a read-only data segment of your binary, commonly known as .rodata (Read-Only Data) or the ROM/Flash memory segment.
+```cpp
+void memoryExample() {
+    // 1. 'ptr' is a local pointer variable sitting on the STACK (8 bytes).
+    // 2. The text "System Boot" lives permanently in FLASH memory (.rodata).
+    // 3. 'ptr' stores the starting memory address of that text in FLASH.
+    const char* ptr = "System Boot"; 
+}
+```
+- The Unsigned Constant Guarantee: Because literals live in read-only memory, attempting to modify them at runtime is Undefined Behavior and will typically result in a hard fault or segmentation fault.
+- C++ enforces this by giving string literals the compiler type of: `Type of "Hello" -> const char[6]`. (Note: It is 6 bytes because of the implicit null terminator `\0` at the end).
+
+#### Character Encoding Prefixes (C++11)
+Different hardware and protocols require different character widths. C++ provides literal prefixes to allow you to specify exactly how many bytes each character in your literal should consume in Flash:
+
+| Prefix                | Type                      | character width   | Encding Use Case                              |
+|:----------------------|:--------------------------|:----------------- |:----------------------------------------------|
+| None (e.g., `"A"`)    | const char[]              | 1 byte            | ASCII / Standard System Logging               |
+| `u8` (e.g., `u8"A"`)  | const char8_t[] (c++20)   | 1 byte            | UTF-8 International compatibility             |
+| `L` (e.g., `L"A"`)    | const wchar_t[]           | 2 or 4 bytes      | Wide characters (platform-dependent)          |
+| `u` (e.g.,`"A"`)      | const char16_t[]          | 2 bytes           | UTF-16 (standard for many network protocols)  |
+| `U` (e.g., `U"A"`)    | const char32_t[]          | 4 bytes           | UTF-32 (raw Unicode code points)              |
+
+#### Raw String Literals (`R"(...)"`): Bypassing the Escape Character
+When writing config files, nested scripts, JSON templates, or Mock Protobuf payloads, escaping characters becomes a major headache. Normally, if you want to print a string with quotes and newlines, you have to escape every single one:
+```cpp
+// Messy, hard to read, prone to typing bugs!
+const char* standard = "{\n\t\"sensor_id\": 42,\n\t\"name\": \"AHT20\"\n}";
+```
+C++11 introduced Raw String Literals. By placing an `R` in front of the quotes, the compiler ignores all escape characters (`\`, `\n`, `\t`, etc.). The string starts at the open parenthesis ( and ends at the close parenthesis ).
+```cpp
+// Beautiful, readable, exact representation of the text:
+const char* raw = R"(
+{
+    "sensor_id": 42,
+    "name": "AHT20"
+}
+)";
+```
+Firmware Use Case: This is fantastic for storing hardcoded HTML files if your ESP32/RPi runs a local status web server, or for writing down JSON payloads to test your local API channels!
+
+#### Modern Suffix Literals (s and sv): C++14/17
+In the previous topic, we discussed how passing a C-string literal ("Hello") to a function expecting a std::string triggers an implicit conversion that could cause a slow heap allocation.
+
+C++14 and C++17 introduced User-Defined Suffixes to solve this. By bringing in a specific namespace, you can append a single letter to your double-quotes to change the variable's type at compile time:
+1. The `"..."s` Suffix (C++14) : Appends `s` to create a `std::string` directly.
+```cpp
+using namespace std::string_literals;
+
+auto normalCStr = "Hello";  // Type: const char* (Pointer to Flash)
+auto realCppStr = "Hello"s; // Type: std::string (Fully constructed object)
+```
+2. The `"..."sv` Suffix (C++17): Appends `sv` to create a `std::string_view` directly.
+```cpp
+using namespace std::string_view_literals;
+
+auto viewStr = "Hello"sv; // Type: std::string_view (No-copy, read-only wrapper)
+```
+3. Why this is a performance win for Systems Engineers:
+    1. If you have a log function expecting a `std::string_view`, passing a standard C-string literal `"System Failed"` forces the computer to calculate the length of the string (strlen) at runtime to find where the null-terminator is.
+    2. If you pass `"System Failed"sv`, the compiler calculates the length of the string on your laptop at compile time. The resulting object contains the pointer and the size directly, executing at maximum hardware speed with zero runtime overhead.
+
+---

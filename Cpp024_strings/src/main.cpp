@@ -5,7 +5,7 @@ void printLog(const std::string& msg);
 void newPrintLog(std::string_view msg);
 
 int main() {
-	std::cout << "========== Topic: C++ Strings ==========" << std::endl;
+	std::cout << "========== Topic: C++ Strings & String Literals ==========" << std::endl;
 	// Defining a raw string in C++
 	const char* rawString = "Hello";
 	std::cout << rawString << std::endl;
@@ -69,6 +69,23 @@ int main() {
 	const char* rawPtr = text.c_str();	// Returns the underlying const char* null-terminated pointer. Crucial when passing C++ strings to C driver libraries!
 
 	std::cout << "Accessing rawPtr pointer and passing to cout: " << rawPtr << std::endl;
+
+    std::cout << "====================================================" << std::endl;
+    std::cout << "============= String Literals ===================" << std::endl;
+
+    // RAW String Literals - R"()";
+    /* C++11 introduced Raw String Literals. By placing an R in front of the quotes, the compiler ignores all escape characters (\, \n, \t, etc.).
+     * The string starts at the open parenthesis ( and ends at the close parenthesis ).
+    */
+    const char* raw = R"(
+    {
+    
+        "SENSOR_ID": 42,
+        "NAME: AHT20
+    }
+    )";
+
+    std::cout << raw << std::endl;
 
 	std::cout << "========================================" << std::endl;
 //	std::cin.get();
