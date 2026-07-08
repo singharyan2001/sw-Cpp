@@ -2541,3 +2541,91 @@ This topic covers an intro to class hierarchies and topics such as virtual, over
 A Class hierarchy offers two kinds of benefits:
 1. Interface Inheritance: An Object of a derived class can be used wherever an object of a base class is required. That is, the base class acts as an interface for the derived class.
 2. Implementation Inheritance: A Base class provides functions or data that simplifies the implementation of derived classes.
+
+
+---
+
+## Arrays in C++
+- Discussed on arrays (a collection of elements of the same type)
+- Hands on explaination of array and its operations.
+- Discussed about Memory access violation / out of bounds access in arrays.
+- Discussed about arrays & pointers.
+- Discussed arrays with stack and heap memory use cases/examples & performace consideration.
+- Discussed about Cpp11 - standard arrays and raw arrays.
+- Discussed about size of an array needs to be tracked for stack and heap based arrays.
+
+### Personal notes
+An array is a collection of elements of the same data type stored in contiguous (sequential) memory locations. In systems and firmware programming, arrays are the fundamental building blocks for buffers, memory maps, and look-up tables.
+
+**Raw Arrays vs C++ 11 standard arrays (`std::array`)**
+
+In C++, you have two primary ways to declare a static (fixed-size) array on the stack:
+- C-Style Raw Array: `int raw[5] = {1,2,3,4,5};`
+- Modern Standard Array: `std::array<int, 5> modern = {1,2,3,4,5};` (Requires `#include <array>`)
+
+Memory Layout Equivalence - Mechanically, both types look identical in RAM, they are both contiguous blocks of memory allocated directly on stack. `Memory Address Offset = Base Address + (Index * Size of element)`
+
+A `std::array` has zero runtime overhead. It is a header-only wrapper around a raw array.
+
+The Pointer Decay Problem - In C, when you pass a raw array to a function, it silently "decays" into a raw pointer to its first element. you lose all type-safety and size information.
+
+```cpp
+
+```
+
+**Stack vs Heap Allocation**
+
+When you allocate your array determines its speed, safety, and lifespan.
+```cpp
+
+```
+
+Performance & Memory Considerations
+1. The Stack:
+    1. Allocation is incredibly fast (literally 1 CPU clock cycle to adjust the stack pointer).
+    2. however, stack memory is tiny (often 2KB on a mcu, 8MB on std linux).
+    3. Large arrays on the stack cause a Stack Overflow.
+2. The Heap:
+    1. Allocation is slow (requires searching the OS "free list" for contiguous space).
+    2. Repeated heap allocations can cause Heap fragmentation, which is a death sentence for long-running firmware.
+
+**Size Tracking & Safety**
+
+because raw arrays decay to pointers, you must manually track theor size. if you get it wrong, you end up with memory corruption.
+
+The traditional C++ way to pass raw arrays - you must use raw arrays, C++ allows you to use templates to capture the array size at compile-time by passing it by reference:
+```cpp
+template <size_t N>
+void printRawArray(int (&arr)[N]) {
+    // N is resolved at compile time based on the array passed!
+    for (size_t i = 0; i < N; i++) {
+        std::cout << arr[i] << " ";
+    }
+}
+
+int main() {
+    int myBuffer[12] = {0};
+    printRawArray(myBuffer); // Compiler automatically deduces N = 12
+}
+```
+
+The Modern Standard Way (`std::array`) - It keeps track of its own size safely and cleanly through its member functions:
+```cpp
+std::array<int, 4> myBank = {10, 20, 30, 40};
+std::cout << "Elements: " << myBank.size() << "\n"; // Returns 4
+```
+
+**Memory Access Violations & Bounds Checking**
+
+What happens when you write to an index that doesn't exist?
+```cpp
+int raw[3] = {1, 2, 3};
+raw[5] = 999; // CRITICAL BUG: Out-of-bounds write!
+```
+
+In C and C++, writing raw[5] does not trigger a compiler error. The CPU will simply calculate the memory address at raw + (5 * 4) and write 999 there.
+- If that memory address belongs to another variable in your program, that variable is now silently corrupted.
+= If that memory address belongs to an invalid memory space, your program crashes with a Segmentation Fault (Memory Access Violation).
+
+**How std::array Gives You the Best of Both Worlds**
+
