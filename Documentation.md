@@ -2890,4 +2890,280 @@ auto viewStr = "Hello"sv; // Type: std::string_view (No-copy, read-only wrapper)
     1. If you have a log function expecting a `std::string_view`, passing a standard C-string literal `"System Failed"` forces the computer to calculate the length of the string (strlen) at runtime to find where the null-terminator is.
     2. If you pass `"System Failed"sv`, the compiler calculates the length of the string on your laptop at compile time. The resulting object contains the pointer and the size directly, executing at maximum hardware speed with zero runtime overhead.
 
----
+## Object Lifetime in C++
+- Discussed about Stack memeory and Heap Memory in Programming.
+- Hands on example of creating objects in the Stack and Heap Memory.
+- Discussed about scoped pointers feature in C++ and hands on example of a class wrapper over a pointer which upon constructor - heap allocated the pointer and upon destruction - deletes the pointer.
+- hands on creating a class wrapper based pointer and seeing its affects over stack and heap memory based use cases.
+- Discusses the use cases of utilizing the automatic creation and destruction can be used like a automatic timer that would create and start the timer and then when we go out of scope, it would destoy and itself and also print the time (amount) it was running for therefore using it for time tracking a certain piece of code or scope.
+
+### Personal Notes
+For a systems or firmware engineer, mastering Object Lifetime is the difference between writing a rock-solid, 24/7 continuous monitoring system and writing firmware that silently leaks RAM and crashes after three days of operation.
+
+#### The Architectural Divide: Stack vs. Heap
+TO understand object lifetime, we must look at how the physical memory is divided during program execution.
+```text
++-------------------------------------------------------------+
+|                     SYSTEM MEMORY (RAM)                     |
++------------------------------+------------------------------+
+|       STACK MEMORY           |         HEAP MEMORY          |
+|  - Fast, automatic storage   |  - Slow, manual/dynamic pool |
+|  - Scope-bound lifecycle     |  - Survives scope exit       |
+|  - Strictly deterministic    |  - High fragmentation risk   |
++------------------------------+------------------------------+
+```
+
+**Stack Memory (Automatic Lifetime):** When you declare a variable inside a function without a `new` keyword, it is allocated on the stack:
+- Allocation Cost: Virtually free (1 CPU cycle to adjust the stack pointer)
+- Lifetime: Strictly tied to the surrounding scope `{...}`.
+- Destruction: The Moment execution exits the closing braces `}`, the memory is instantly reclaimed, and the compiler automatically runs the class's Destructor.
+- Safety: 100% leak-safe.
+
+**Heap Memory (Dynamic/Manual Lifetime):** When you allocate memory using the `new` keyword (or `malloc`), it sits in the Heap:
+- Allocation Cost: Expensive (requires travesal of the OS/RTOS memory free list, taking hundreds of cycles).
+- Lifetime: Independent of scope. The object lives until tou explicitly command its destruction.
+- Destruction: Requires a manual `delete` (or `delete[]`) call.
+- Safety: Highly prone to memory leaks if a pointer is lost, or "double free" faults if deleted twice.
+
+#### RAII: The C++ Scoped Pointer Pattern
+How do we get the massive, flexible size of the heap with the absolute safetly of the Stack? we wrap the heap pointer inside a stack-allocated object. This paradigm is known as Resource Acquisition Is Intialization [RAII].
+
+**Example:**
+
+```cpp
+// object lifetime in C++
+#include <iostream>
+
+//========================= RAII EXAMPLE - THE SCOPED POINTER POINTER ================================
+
+class IntBuffer {
+public:
+    IntBuffer(){
+        std::cout << "[ALLOC] IntBuffer allocated on Heap." << std::endl;
+    }
+
+    ~IntBuffer(){
+        std::cout << "[FREE] IntBuffer deleted from Heap." << std::endl;
+    }
+    void doWork(){
+        std::cout << " -> IntBuffer processing sensor telemety...\n";
+    }
+};
+
+// our custom scoped pointer wrapper
+class ScopedIntBuffer{
+private:
+    IntBuffer *m_RawPointer; // The resource being wrapped
+public:
+    // Constructor: we take ownership of a raw heap pointer
+    explicit ScopedIntBuffer(IntBuffer* rawPtr): m_RawPointer(rawPtr) {};
+
+    // Destructor: Frees the pointer automatically on scope exit!
+    ~ScopedIntBuffer(){
+        delete m_RawPointer;
+    }
+
+    // Overload the arrow operator to let users use this wrapper like a pointer
+    IntBuffer* operator->() {
+        return m_RawPointer;
+    }
+};
+
+void runTelemetryRoutine();
+
+//====================================================================================================
+
+
+int main(){
+    std::cout << "========== TOPIC: OBJECT LIFETIME IN C++ ==========" << std::endl;
+    runTelemetryRoutine();
+    std::cout << "===================================================" << std::endl;
+    std::cin.get();
+}
+
+void runTelemetryRoutine(){
+    std::cout << "Entering runTelemetryRoutine()\n";
+
+    // Instantiating our scoped wrapper on the STACK.
+    // In its constructor, it captures a newly created IntBuffer sitting on the HEAP.
+    ScopedIntBuffer sensorData(new IntBuffer());
+
+    sensorData->doWork();
+
+    std::cout << "Exiting runTelementryRoutine()\n";
+    // Automatic Stack Cleanup:
+    // 'sensorData' falls out of scope here.
+    // The compiler automatically calls ~ScopedIntBuffer().
+    // Inside that destructor, 'delete m_RawPointer' is executed.
+    // The heap memory is freed with ZERO manual delete statements!
+}
+```
+```text
+Output Log:
+========== TOPIC: OBJECT LIFETIME IN C++ ==========
+Entering runTelemetryRoutine()
+[ALLOC] IntBuffer allocated on Heap.
+ -> IntBuffer processing sensor telemety...
+Exiting runTelementryRoutine()
+[FREE] IntBuffer deleted from Heap.
+===================================================
+```
+
+#### Scoped Telemetry Pattern: Automatic Timing Profiler
+In embedded firmware, we often need to profile exactly how long a transaction (like writing to Flash or executing an FFT algorithm) takes.
+
+Using C++ Object Lifetime rules, we can build a Telemetry Timer that begins profiling the moment it's initialized on the stack, and prints the performance logs automatically when the block finishes executing.
+
+```cpp
+// object lifetime in C++
+#include <iostream>
+
+#include <chrono>
+#include <thread> // Simulating hardware delay
+
+//========================= RAII EXAMPLE - THE SCOPED POINTER POINTER ================================
+
+class IntBuffer {
+public:
+    IntBuffer(){
+        std::cout << "[ALLOC] IntBuffer allocated on Heap." << std::endl;
+    }
+
+    ~IntBuffer(){
+        std::cout << "[FREE] IntBuffer deleted from Heap." << std::endl;
+    }
+    void doWork(){
+        std::cout << " -> IntBuffer processing sensor telemety...\n";
+    }
+};
+
+// our custom scoped pointer wrapper
+class ScopedIntBuffer{
+private:
+    IntBuffer *m_RawPointer; // The resource being wrapped
+public:
+    // Constructor: we take ownership of a raw heap pointer
+    explicit ScopedIntBuffer(IntBuffer* rawPtr): m_RawPointer(rawPtr) {};
+
+    // Destructor: Frees the pointer automatically on scope exit!
+    ~ScopedIntBuffer(){
+        delete m_RawPointer;
+    }
+
+    // Overload the arrow operator to let users use this wrapper like a pointer
+    IntBuffer* operator->() {
+        return m_RawPointer;
+    }
+};
+
+void runTelemetryRoutine();
+
+//====================================================================================================
+
+//============= RAII EXAMPLE - SCOPED TELEMETRY PATTERN: AUTOMATIC TIMING PROFILER ===================
+
+class ScopedTimer{
+private:
+    const char* m_TaskName;
+    std::chrono::time_point<std::chrono::high_resolution_clock> m_StartTime;
+public:
+    // Start timing at birth (Instantiation)
+    explicit ScopedTimer(const char* taskName) : m_TaskName(taskName) {
+        m_StartTime = std::chrono::high_resolution_clock::now();
+        std::cout << "[PROFILE START] Working on task: " << m_TaskName << "\n";
+    }
+
+    // Stop timing and print logs at death (Destruction)
+    ~ScopedTimer() {
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        // Calculate duration in microseconds
+        auto startUs = std::chrono::time_point_cast<std::chrono::microseconds>(m_StartTime).time_since_epoch().count();
+        auto endUs = std::chrono::time_point_cast<std::chrono::microseconds>(endTime).time_since_epoch().count();
+        auto durationUs = endUs - startUs;
+        double durationMs = durationUs * 0.001; // convert to milliseconds
+
+        std::cout << "[PROFILE END] " << m_TaskName << " finished in " 
+                  << durationMs << " ms (" << durationUs << " us)\n\n";
+    }
+};
+
+
+void runFftAnalysis();
+
+//====================================================================================================
+
+int main(){
+    std::cout << "========== TOPIC: OBJECT LIFETIME IN C++ ==========" << std::endl;
+    runTelemetryRoutine();
+
+    std::cout << "--- SYSTEM DIAGNOSTIC RUN ---\n\n";
+    
+    runFftAnalysis();
+    
+    // We can also profile smaller internal blocks of code using nested braces {}
+    {
+        ScopedTimer dbTimer("Flash Write Verification");
+        std::this_thread::sleep_for(std::chrono::milliseconds(12));
+    }
+
+    std::cout << "--- DIAGNOSTIC COMPLETE ---\n";
+    
+    std::cout << "===================================================" << std::endl;
+    std::cin.get();
+}
+
+void runTelemetryRoutine(){
+    std::cout << "Entering runTelemetryRoutine()\n";
+
+    // Instantiating our scoped wrapper on the STACK.
+    // In its constructor, it captures a newly created IntBuffer sitting on the HEAP.
+    ScopedIntBuffer sensorData(new IntBuffer());
+
+    sensorData->doWork();
+
+    std::cout << "Exiting runTelementryRoutine()\n";
+    // Automatic Stack Cleanup:
+    // 'sensorData' falls out of scope here.
+    // The compiler automatically calls ~ScopedIntBuffer().
+    // Inside that destructor, 'delete m_RawPointer' is executed.
+    // The heap memory is freed with ZERO manual delete statements!
+}
+
+
+void runFftAnalysis() {
+    // 1. Instantiating the ScopedTimer at the top of the function
+    ScopedTimer timer("FFT Hardware Compute Loop");
+
+    // 2. Simulating a heavy computation delay
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+}
+```
+```text
+Output Log:
+========== TOPIC: OBJECT LIFETIME IN C++ ==========
+Entering runTelemetryRoutine()
+[ALLOC] IntBuffer allocated on Heap.
+ -> IntBuffer processing sensor telemety...
+Exiting runTelementryRoutine()
+[FREE] IntBuffer deleted from Heap.
+
+--- SYSTEM DIAGNOSTIC RUN ---
+
+[PROFILE START] Working on task: FFT Hardware Compute Loop
+[PROFILE END] FFT Hardware Compute Loop finished in 50.222 ms (50222 us)
+
+[PROFILE START] Working on task: Flash Write Verification
+[PROFILE END] Flash Write Verification finished in 12.092 ms (12092 us)
+
+--- DIAGNOSTIC COMPLETE ---
+===================================================
+```
+
+#### Key Firmware Benefits of RAII
+- **Deterministic Lock Releases:** In multi-core systems (like the Raspberry Pi 5), you can use `std::lock_guard` to lock a mutex. Because of lifetime rules, the mutex is unlocked automatically when the function exits, preventing catastrophic deadlocks.
+- **Deterministic Shutdowns:** Driver teardowns or closing SPI/UART ports can be embedded in the destructor. If a function errors out or returns early, C++ guarantees the driver destructs cleanly anyway.
+- **No Garbage Collection Latency:** Unlike languages with a garbage collector (Java, Go, Python), memory release in C++ is immediate, deterministic, and instant. Your control loop will never stutter due to a random background cleanup cycle.
+
+
+## Smart Pointers in C++
