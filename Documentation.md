@@ -3171,4 +3171,292 @@ Exiting runTelementryRoutine()
 - Smart pointers are basically a wrapper around a raw pointer.
 - Discusses about unique pointer, which is a scoped pointer, and when it does out of scope it will get destroyed by calling the destructor. Unique pointers cannot be copied.
 - Discusses about `<memory>` header, through which we can use the unique pointer.
-- 
+- Discusses about creating/defining a unique pointer and also talks about using `std::make_unique<Entitiy>();`
+- Discusses about shared pointer (`std::shared_ptr`) and how shared pointers work, which utilizes reference counting. and also talks about using `std::make_shared<Entitiy>`.
+- Discusses about weak pointer (`std::weak_ptr`)
+- Discussed when to use unique pointers, shared pointers, and weak pointers.
+
+### Personal Notes
+In modern C++, writting raw `new` and `delete` statements is considered a dangerous anti-pattern. If a function throws an exception or returns early, a raw `delete` statement can easily be bypassed, casuing a silent memory leak.
+
+Smart Pointers (Introduced in Cpp11 via the `<memory>` header) solves this, they are lightweight wrapper classes that manage a raw heap pointer. By utilizing RAII, They automatically destroy the heap object and reclaim its memory the moment the wrapper goes out of scope.
+
+#### The Decision Matrix: Which Pointer to Use?
+Before looking at the syntax, you should memorize this standard systems architecture decision tree:
+```text
+                  Do you need multiple owners for this resource?
+                                /                \
+                               No                Yes
+                              /                    \
+              Use std::unique_ptr              Do you have cyclic loops?
+              - Zero runtime overhead          (e.g., parent <-> child nodes)
+              - Uniquely owns resource         /                       \
+                                              Yes                      No
+                                             /                           \
+                                     Use std::weak_ptr             Use std::shared_ptr
+                                     - Non-owning ref              - Reference counted
+                                     - Breaks memory loops         - Thread-safe tracking
+```
+
+#### Unique Pointer (`std::unique_ptr`): Exclusive Ownership
+A `std::unique_ptr` represents exclusive ownership of a heap resource. It guarantees that only one pointer can own the inderlying object at any given time.
+
+##### Key Characteristics:
+- Zero-Cost Abstraction: It compiles down to a raw pointer. It has exactly 0 bytes of runtime memory overhead compared to a raw pointer and executes at identical physical speed.
+- Non-Copyable: The copy constructor is explicitly deleted. If you try to copy a `unique_ptr`, the compiler will block the build.
+- Movable: While you cannot copy it, you can transfer ownership to another `unnique_ptr` using the Move Semantics (`std::move`)
+
+##### Hands-on: Managing a Polymorphich Driver HAL
+Here is how we use `std::unique_ptr` to manage the lifecycle of our polymorphic drivers from phase 2 without worrying about leaks:
+```cpp
+#include <iostream>
+#include <memory>
+
+class IDriver {
+public:
+    virtual void configure() = 0;
+    virtual ~IDriver() { std::cout << "[IDriver] Destructor executed cleanly.\n"; }
+};
+
+class UartDriver : public IDriver {
+public:
+    UartDriver() { std::cout << "[Uart] Hardware configured on UART1.\n"; }
+    ~UartDriver() override { std::cout << "[Uart] Hardware port closed.\n"; }
+    void configure() override { std::cout << "  -> Adjusting baud rate to 115200...\n"; }
+};
+
+void runCommRoutine() {
+    std::cout << "--- Entering runCommRoutine() ---\n";
+
+    // Standard Way to instantiate: std::make_unique<T>()
+    // This is safer and more exception-safe than: std::unique_ptr<UartDriver>(new UartDriver())
+    std::unique_ptr<IDriver> commPort = std::make_unique<UartDriver>();
+
+    commPort->configure();
+
+    // COMPILER ERROR! Coping is strictly prohibited:
+    // std::unique_ptr<IDriver> copiedPort = commPort; 
+
+    // Move Semantics: Transferring ownership to another scoped block
+    std::unique_ptr<IDriver> movedPort = std::move(commPort);
+    if (!commPort) {
+        std::cout << "[Info] 'commPort' is now empty (Null). Ownership moved to 'movedPort'.\n";
+    }
+
+    std::cout << "--- Exiting runCommRoutine() ---\n";
+    // Automatic cleanup: 'movedPort' falls out of scope here.
+    // The heap-allocated UartDriver is automatically deleted!
+}
+
+int main() {
+    runCommRoutine();
+    return 0;
+}
+```
+```text
+Output Logs:
+--- Entering runCommRoutine() ---
+[Uart] Hardware configured on UART1.
+  -> Adjusting baud rate to 115200...
+[Info] 'commPort' is now empty (Null). Ownership moved to 'movedPort'.
+--- Exiting runCommRoutine() ---
+[Uart] Hardware port closed.
+[IDriver] Destructor executed cleanly.
+```
+
+##### Deep-Dive: What exactly does this Unique Pointer code explain?
+- The Core Safety of `std::make_unique`:
+    - The code instantiates our driver using `std::make_unique<UartDriver>()` rather than `std::unique_ptr<IDriver>(new UartDriver())`. This teaches exception-safe code design.
+    -  If you use raw `new` inside a function argument and another sub-expression throws an exception before the smart pointer constructor finishes, the raw pointer is leaked. `std::make_unique` completely prevents this.
+- How the Compiler Enforces Single Ownership:
+    - By commenting out `std::unique_ptr<IDriver> copiedPort = commPort;`, the code proves that the compiler physically deletes the Copy Constructor of unique_ptr.
+    - This makes it impossible for a developer to accidentally duplicate owners, which would otherwise result in a catastrophic "double-free" error at runtime.
+- The Mechanics of a "Move" (`std::move`):
+    - `std::move` does not physically move the underlying `UartDriver` object in the heap.
+    - Instead, it re-seats the pointers on the stack. 
+    - The internal address held by `commPort` is copied to `movedPort`, and then `commPort` is instantly set to `nullptr`.
+    - The check `if (!commPort)` is included to explicitly prove that the original handle is now safely empty, preventing accidental null-pointer usage.
+- Guaranteed Destruction via Scope (RAII):
+    - The exit output logs prove that the moment `movedPort` falls out of scope, the destructor is fired cleanly.
+    - Even though the pointer was moved, C++ successfully tracked the final owner and freed the memory automatically, leaving absolutely zero memory leaks.
+
+
+
+#### Shared Pointer (`std::shared_ptr`): Reference Counting
+Sometimes, a single hardware resource needs to be shared across multiple independent modules (for instance, a single I2C LogBuffer referenced by the three different sensor threads)
+
+A `std::shared_ptr` uses Reference Counting to track how many active pointers are referencing the same object on the Heap.
+
+How Reference Counting works:
+1. When you instantiate a `shared_ptr`, C++ allocates a small Control Block on the heap alongside the object.
+2. The Control Block stores a counter: Reference Count = N
+3. Every time you copy the `shared_ptr` to a new module, the counter increments (N + 1).
+4. When a `shared_ptr` goes out of scope or is destroyed, the counter decrements (N - 1).
+5. The Magic Moment: When the reference count drops to exactly 0, the object is instantly deleted from the Heap.
+```cpp
+#include <iostream>
+#include <memory>
+
+class SharedLogBuffer {
+public:
+    SharedLogBuffer() { std::cout << "[ALLOC] Global DMA Log Buffer Allocated.\n"; }
+    ~SharedLogBuffer() { std::cout << "[FREE] DMA Log Buffer deallocated.\n"; }
+    void writeLog(const char* text) { std::cout << "  [Buffer LOG]: " << text << "\n"; }
+};
+
+void runWorkerThread(std::shared_ptr<SharedLogBuffer> logger, int threadId) {
+    std::cout << "  [Thread " << threadId << "] Working... Count: " << logger.use_count() << "\n";
+    logger->writeLog("Sensor interrupt processed.");
+    // Logger falls out of scope, count decrements
+}
+
+int main() {
+    std::cout << "--- Initializing System ---\n";
+
+    // Rule: Always use std::make_shared! 
+    // It is a massive performance win because it performs ONE single heap allocation
+    // containing both the managed object AND the control block together.
+    std::shared_ptr<SharedLogBuffer> systemLogger = std::make_shared<SharedLogBuffer>();
+    std::cout << "Active Owners: " << systemLogger.use_count() << "\n"; // Outputs 1
+
+    {
+        std::cout << "\n--- Spawning Simulated Thread Scope ---\n";
+        // Copying the shared pointer increments the reference count
+        std::shared_ptr<SharedLogBuffer> threadReference = systemLogger;
+        std::cout << "Active Owners: " << systemLogger.use_count() << "\n"; // Outputs 2
+        
+        runWorkerThread(threadReference, 1);
+        std::cout << "Active Owners after sub-scope thread call: " << systemLogger.use_count() << "\n";
+    } // threadReference goes out of scope here. Count decrements to 1.
+
+    std::cout << "\nActive Owners (Main only): " << systemLogger.use_count() << "\n";
+    
+    std::cout << "--- Shutting down system ---\n";
+    systemLogger.reset(); // Manually dropping main's ownership. Count hits 0!
+    std::cout << "System offline.\n";
+    return 0;
+}
+```
+```text
+Output log:
+--- Initializing System ---
+[ALLOC] Global DMA Log Buffer Allocated.
+Active Owners: 1
+
+--- Spawning Simulated Thread Scope ---
+Active Owners: 2
+  [Thread 1] Working... Count: 3
+  [Buffer LOG]: Sensor interrupt processed.
+Active Owners after sub-scope thread call: 2
+
+Active Owners (Main only): 1
+--- Shutting down system ---
+[FREE] DMA Log Buffer deallocated.
+System offline.
+```
+
+⚠️ The Runtime Cost of Reference Counting: Increments and decrements of the reference count are strictly atomic operations. This guarantees thread-safety when sharing references across cores (like on the Raspberry Pi 5), but atomic calculations introduce pipeline stalls and lock instructions that can impact hot code path execution.
+
+##### Deep-Dive: What exactly does this Shared Pointer code explain?
+- Why `std::make_shared` is a Performance Mandate:
+    - Under the hood, a `std::shared_ptr` needs memory for the actual object (like `SharedLogBuffer`) AND a Control Block (which tracks the reference count).
+    - If you write `std::shared_ptr<T>(new T())`, the compiler is forced to make two separate, slow heap allocations.
+    - Using `std::make_shared` forces the compiler to allocate one single contiguous block of memory containing both, doubling your allocator performance.
+- The Lifetime Lifecycle of Reference Counting: The logs demonstrate the rise and fall of the reference count:
+    - Count = 1: The object is born in `main()`.
+    - Count = 2: `threadReference` copies the pointer inside the inner curly-braces scope `{ ... }`.
+    - Count = 3: The pointer is passed by value into `runWorkerThread()`, incrementing the counter as it enters the function.
+    - Count = 2: `runWorkerThread()` finishes and its local copy is destroyed.
+    - Count = 1: The inner curly-braces scope exits, destroying `threadReference`.
+- Manual Ownership Release (`.reset()`): By executing `systemLogger.reset()`, the code demonstrates how to manually sever an ownership link. Because this is the last outstanding owner, the reference count drops to exactly 0, causing the destructor `~SharedLogBuffer()` to run immediately.
+
+#### Weak Pointer (`std::weak_ptr`): Resolving Circular References
+If two structures point to each other using `std::shared_ptr`, they create a cyclic dependency. Because each holds a pointer to the other, the reference counts can never hit $0$, causing a permanent, catastrophic memory leak on the Heap.
+
+A `std::weak_ptr` acts as a non-owning observer. It points to a resource managed by a `std::shared_ptr` but does not increment the reference count.
+
+##### Breaking a Cyclic Memory Leak
+Look at how easily two dependent units can lock each other in RAM, and how a weak pointer snaps the loop:
+```cpp
+#include <iostream>
+#include <memory>
+
+class Controller; // Forward declaration
+
+class DroneMotor {
+public:
+    // LOOP TRAP: If this was a std::shared_ptr, neither would ever destruct!
+    std::weak_ptr<Controller> m_ControllerRef; 
+
+    ~DroneMotor() { std::cout << "[Motor] Despawned safely.\n"; }
+};
+
+class Controller {
+public:
+    std::shared_ptr<DroneMotor> m_MotorRef;
+
+    ~Controller() { std::cout << "[Controller] Despawned safely.\n"; }
+};
+
+int main() {
+    std::cout << "--- Spawning Controller & Motor Loop ---\n";
+    
+    auto mainController = std::make_shared<Controller>();
+    auto rotor1 = std::make_shared<DroneMotor>();
+
+    // Link them together
+    mainController->m_MotorRef = rotor1;
+    rotor1->m_ControllerRef = mainController; // Stored safely inside a weak pointer!
+
+    std::cout << "Main Controller reference count: " << mainController.use_count() << "\n";
+    std::cout << "Rotor Motor reference count: " << rotor1.use_count() << "\n";
+
+    // How to access a weak pointer: 
+    // You cannot read it directly because the object might have already been deleted.
+    // You must promote it temporarily to a shared_ptr using `.lock()`
+    if (auto tempControllerShared = rotor1->m_ControllerRef.lock()) {
+        std::cout << "[Verification] Motor successfully verified its controller link.\n";
+    }
+
+    std::cout << "--- Leaving Main Scope ---\n";
+    return 0; // Everything cleans up perfectly!
+}
+```
+```text
+--- Spawning Controller & Motor Loop ---
+Main Controller reference count: 1
+Rotor Motor reference count: 2
+[Verification] Motor successfully verified its controller link.
+--- Leaving Main Scope ---
+[Controller] Despawned safely.
+[Motor] Despawned safely.
+```
+
+##### Deep-Dive: What exactly does this Weak Pointer code explain?
+- How the "Circular Lock" is Snapped:
+    - if DroneMotor used `std::shared_ptr<Controller>`, when `main()` exits, the compiler would try to destroy `mainController`.
+    - However, the compiler sees that `rotor1` still holds a reference to it, so the count stays at 1 and `mainController` is kept alive. But wait! `mainController` is also keeping `rotor1` alive!
+    -  They are locked in a death grip, leaking memory. By using `std::weak_ptr` inside the motor, the motor can point to the controller without incrementing its reference count. When the main scope exits, the controller's count drops to 0 cleanly, triggering a cascade cleanup.
+- The "Non-Owning Reference" Principle: 
+    - Notice that the console output shows the Motor's count as 2 (owned by `main()` and `mainController`), but the Controller's count is only 1 (owned by `main()`, even though the motor points to it!). This proves the weak pointer has zero ownership over the controller's lifetime.
+- The Promotion Mechanism (`.lock()`):
+    - Because a weak pointer doesn't own the memory, the object it is looking at could disappear at any second.
+    - The CPU cannot safely execute `rotor1->m_ControllerRef->doSomething()`. 
+    - To read or write to the object, you must call `.lock()`.
+    - This is a thread-safe atomic check that asks: "Is the target still alive?" If yes, it temporarily constructs a standard `std::shared_ptr` so you can use it safely.
+    - If the object was already deleted, `.lock()` simply returns a null shared_ptr`, allowing your code to fail gracefully.
+
+#### Guidelines
+1. **Default to `std::unique_ptr`:** 90% of your heap allocations in systems and gRPC networking code should use unique pointers. They are completely free, highly optimized, and restrict complex object scopes to exactly where they belong.
+2. **Use `std::shared_ptr` only when multiple modules must share data lifetime control:** Ensure you are using `std::make_shared` to minimize OS allocator overhead.
+3. **Use `std::weak_ptr` to monitor resources:** Use them to break ownership loops or to cache references to dynamic resources that might be deleted in a separate context.
+
+### Smart Pointers Application (More info/notes to understand the concept)
+
+
+
+## Auto Keyword in C++
+- Discusses about the auto keyword and how it can be used in code.
+- Showcases examples of when and when not to use the auto keyword.
+- Discussed the benefits and drawbacks of using the auto keyword.
+-  

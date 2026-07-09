@@ -30,3 +30,47 @@ You can execute it straight from the terminal to see your output:
 ```
 
 ---
+
+## To Debug your C++ Code
+1. Go to run & debug section in the VS Code
+2. Create a Debug Configuration file (a dynamic config file)
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Current Active Subfolder",
+            "type": "cppdbg",
+            "request": "launch",
+            // Dynamically points to: /workspace/relative_folder_path/relative_folder_name
+            "program": "${workspaceFolder}/${relativeFileDirname}/${relativeFileDirname}",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/${relativeFileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
+```
+3. Modify your code in any sub-directory
+4. Recompile manually in your terminal:
+```bash
+cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+
+```
+3. Set you break point.
+4. Make sure main.cpp is your active tab open on the screen.
+5. Press `F5`
+
+---
