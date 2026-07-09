@@ -3167,3 +3167,8 @@ Exiting runTelementryRoutine()
 
 
 ## Smart Pointers in C++
+- Discusses about allocating memeory via new and freeing memory voia delete, and smart pointers help to basically automate this process.
+- Smart pointers are basically a wrapper around a raw pointer.
+- Discusses about unique pointer, which is a scoped pointer, and when it does out of scope it will get destroyed by calling the destructor. Unique pointers cannot be copied.
+- Discusses about `<memory>` header, through which we can use the unique pointer.
+- 
