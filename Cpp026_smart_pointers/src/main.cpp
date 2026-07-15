@@ -2,6 +2,11 @@
 #include <iostream>
 #include <memory>
 
+#include <queue>
+#include <thread>
+#include <utility>
+#include <vector>
+
 //
 class Sensor{
 private:
@@ -101,7 +106,7 @@ void runWorkerThread(std::shared_ptr<SharedLogBuffer> logger, int threadId){
 
 //==============================================================================================
 
-//============================== Unique Pointer Concept ========================================
+//============================== Weak Pointer Concept ========================================
 
 class Controller; // Forward Declaration
 
@@ -126,6 +131,122 @@ public:
 
 //==============================================================================================
 
+//============================== EXAMPLE USE CASE: Unique Pointer Concept ========================================
+// iostream, memory, Queue, thread, utility, vector
+
+struct RxPacket {
+    // Data Attributes
+    uint16_t packetId;
+    std::vector<uint8_t> payload;
+
+    // Constructor
+    RxPacket(uint16_t id, std::vector<uint8_t> data) : packetId(id), payload(data) {
+        std::cout << "[ALLOC] Packet #" << packetId << " allocated in RAM.\n";
+    }
+
+    // Destructor
+    ~RxPacket(){
+        std::cout << "[FREE] Packet #" << packetId << " safely deallocated.\n";
+    }
+};
+
+// Simulated thread-safe queue holding exclusive ownership of packets
+std::queue<std::unique_ptr<RxPacket>> transitQueue;
+
+void dmaReceiverTask(){
+    std::cout << "[DMA Task] Interrupt triggered! Frame complete.\n";
+
+    // Allocate packet exclusively
+    auto newPacket = std::make_unique<RxPacket>(101, std::vector<uint8_t>{0xAA, 0xBB, 0xCC});
+
+    // We can write to it safely here...
+    newPacket->payload.push_back(0xDD);
+
+    std::cout << "[DMA Task] Passing packet to transit queue...\n";
+
+    // Transfer exclusive ownership to the queue.
+    //After this line, 'newPacket' is nullptr and this thread can no longer access it
+    transitQueue.push(std::move(newPacket));
+}
+
+/*
+ * transitQueue.front():
+ * 1. This looks at the item sitting at the very front of your queue (the oldest packet that has been waiting the longest).
+ * 2. It returns a reference to that item, but does not remove it from the queue yet.
+ * 
+ * std::move(...):
+ * 1. This is the critical mechanism. Because std::unique_ptr guarantees exclusive ownership, you cannot use a regular assignment (=), which would attempt to make a copy.
+ * 2. std::move casts the item into an "rvalue reference", signaling to the compiler: "I am done using this item inside the queue; go ahead and strip its data out."
+ * 
+ * std::unique_ptr<RxPacket> activePacket = ...: This invokes the Move Constructor of your new local variable, activePacket.
+ * 
+ * What happens in memory during Line 1:
+ * 1. activePacket takes over the memory address pointer to the RxPacket data.
+ * 2. The slot at the front of transitQueue is cleared out and set to nullptr.
+ * 3. The reference count or heap data is never duplicated; only the raw address pointer changes hands.
+ * 
+ * transitQueue.pop(): This officially deletes the element at the front of the queue and reduces the queue's size by 1.
+ * 
+ * Why the order matters:
+ * 1. If you ran transitQueue.pop() before moving the data, the queue would instantly destroy its internal std::unique_ptr, which would trigger delete on the underlying RxPacket memory, causing a total data loss or crash.
+ * 2. By running std::move first, you safely clear out the queue's pointer. When pop() is executed on the second line, it simply discards an empty nullptr shell, leaving your heap-allocated RxPacket completely intact and safely owned by your local activePacket variable.
+*/
+void packetParserTask(){
+    if(transitQueue.empty()){
+        return;
+    }
+    
+    // POP the exclusive ownership from the queue into out local variable
+    std::unique_ptr<RxPacket> activePacket = std::move(transitQueue.front());
+    transitQueue.pop();
+
+    std::cout << "[Parser Task] Safely acquired exclusive lock on Packet #" << activePacket->packetId << "\n";
+    std::cout << "  -> Packet payload size: " << activePacket->payload.size() << " bytes.\n";
+
+    // When 'activePacket' goes out of scope here, it is automatically destroyed!
+    std::cout << "[Parser Task] Work complete. Leaving scope...\n";
+}
+
+//==================================================================================================
+
+//============================== Shared Pointer Concept ========================================
+// iostream, memory, thread, chrono
+struct WeatherSnapshot {
+    float temperature;
+    float humidity;
+    float pressure;
+    uint64_t timestamp_ms;
+
+    WeatherSnapshot(float t, float h, float p, uint64_t ts)
+        : temperature(t), humidity(h), pressure(p), timestamp_ms(ts) {
+        std::cout << "[ALLOC] Snapshot created at " << timestamp_ms << " ms\n";
+    }
+
+    ~WeatherSnapshot() {
+        std::cout << "[FREE] Snapshot deleted cleanly from memory.\n";
+    }
+};
+
+// Simulated tasks running on different threads/cores
+void oledDisplayTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    // Local copy of pointer increments the count
+    std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Super fast
+    std::cout << "  -> [OLED Task] Updated UI. Temp: " << snapshot->temperature << " C\n";
+}
+
+void sdLoggerTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(30)); // Medium speed
+    std::cout << "  -> [SD Task] Snapshot written to flash log.\n";
+}
+
+void wifiPublisherTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(80)); // Slow network delay
+    std::cout << "  -> [WiFi Task] Sent telemetry payload to AWS IoT Cloud.\n";
+}
+
+
+
+//==================================================================================================
 
 int main(){
     std::cout << "===================== TOPIC: SMART POINTERS IN C++ ===============\n" << std::endl;
@@ -220,8 +341,45 @@ int main(){
         std::cout << "[Verification] Motor successfully verified its controller link \n";
     }
 
-    std::cout << "--- Leaving Main Scope ---\n";
+    std::cout << "================= UNIQUE POINTER EXAMPLE USE CASE II ===================" << std::endl;
+    std::cout << "=== SYSTEM BOOT: DMA PIPELINE RUN ===\n\n";
 
+    dmaReceiverTask();
+    std::cout << "\n--- Queue holds ownership of packet ---\n\n";
+    packetParserTask();
+
+    std::cout << "\n=== DIAGNOSTIC RUN ENDED ===" << std::endl;
+    std::cout << "=====================================================================" << std::endl;
+
+    std::cout << "================= SHARED POINTER EXAMPLE USE CASE II ===================" << std::endl;
+    std::cout << "=== SYSTEM BOOT: IoT WEATHER SNAPSHOT RUN ===\n\n";
+
+    {
+        // 1. Thread spawns a new sensor snapshot
+        std::shared_ptr<const WeatherSnapshot> latestReading = 
+            std::make_shared<const WeatherSnapshot>(24.85f, 62.4f, 1012.3f, 45000ULL);
+
+        std::cout << "Active Owners: " << latestReading.use_count() << "\n\n";
+
+        // 2. Dispatch tasks (In an RTOS, this copies pointers into OS queues)
+        // Here we simulate concurrent execution by passing the shared_ptr to threads
+        std::thread t1(oledDisplayTask, latestReading);
+        std::thread t2(sdLoggerTask, latestReading);
+        std::thread t3(wifiPublisherTask, latestReading);
+
+        // Main loop can immediately drop its local ownership to continue polling sensors
+        latestReading.reset(); 
+        std::cout << "[Main Thread] Dropped local owner pointer. System waiting for tasks...\n\n";
+
+        t1.join();
+        t2.join();
+        t3.join();
+    } 
+
+    std::cout << "\n=== DIAGNOSTIC RUN ENDED ===" << std::endl;
+    std::cout << "========================================================================" << std::endl;
+
+    std::cout << "--- Leaving Main Scope ---\n";
     std::cout << "=====================================================================" << std::endl;
     std::cin.get();
 }
