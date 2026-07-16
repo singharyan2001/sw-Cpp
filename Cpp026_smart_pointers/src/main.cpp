@@ -7,6 +7,8 @@
 #include <utility>
 #include <vector>
 
+#include <algorithm>
+
 //
 class Sensor{
 private:
@@ -230,21 +232,74 @@ struct WeatherSnapshot {
 // Simulated tasks running on different threads/cores
 void oledDisplayTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
     // Local copy of pointer increments the count
+    std::cout << "[OLED DISPLAY TASK] Weather Snapshot shared pointer count: " << snapshot.use_count() << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Super fast
     std::cout << "  -> [OLED Task] Updated UI. Temp: " << snapshot->temperature << " C\n";
 }
 
 void sdLoggerTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    std::cout << "[LOGGER TASK] Weather Snapshot shared pointer count: " << snapshot.use_count() << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(30)); // Medium speed
     std::cout << "  -> [SD Task] Snapshot written to flash log.\n";
 }
 
 void wifiPublisherTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    std::cout << "[WIFI PUBLISHER TASK] Weather Snapshot shared pointer count: " << snapshot.use_count() << std::endl;
     std::this_thread::sleep_for(std::chrono::milliseconds(80)); // Slow network delay
     std::cout << "  -> [WiFi Task] Sent telemetry payload to AWS IoT Cloud.\n";
 }
 
+//==================================================================================================
 
+//=================================== Weak Pointer Concept =========================================
+// isotram, memory, vector, algorithm
+// The Interface that debugging widgets must implement
+class IMUObserver{
+public:
+    virtual void onTelemetryUpdate(float pitch, float roll) = 0;
+    virtual ~IMUObserver() = default;
+};
+
+// A Concrete Observer (OLED Display View)
+class OledGraphicView : public IMUObserver{
+public:
+    void onTelemetryUpdate(float pitch, float roll) override {
+        std::cout << "[OLED View] Drawing graph -> Pitch: " << pitch << ", Roll: " << roll << std::endl;
+    }
+
+    ~OledGraphicView(){
+        std::cout << "[OLED View] Destructor: Widget closed & cleaned up.\n";
+    }
+};
+
+// The central broadcaster service
+class SensorBroadcaster {
+private:
+    std::vector<std::weak_ptr<IMUObserver>> m_Observer;
+public:
+    void registerObserver(std::weak_ptr<IMUObserver> observer){
+        m_Observer.push_back(observer);
+        std::cout << "[Broadcaster] New Observer registered \n";
+    }
+
+    void broadcast(float pitch, float roll){
+        std::cout << "\n[Broadcaster] Broadcasting telemetry payload to registered observers...\n";
+        // Iterate and Filter out dead observrs
+        auto it = m_Observer.begin();
+        while(it != m_Observer.end()){
+            // Attempt to promote the weak pointer
+            if(auto sharedObserver = it->lock()){
+                sharedObserver->onTelemetryUpdate(pitch, roll);
+                ++it;
+            }
+            else{
+                // The Observer was destroyed in background! clean up vector.
+                std::cout << "[Broadcaster] Dead observer detected. Purging from registery...\n";
+                it = m_Observer.erase(it);
+            }
+        }
+    }
+};
 
 //==================================================================================================
 
@@ -293,6 +348,16 @@ int main(){
     // UNIQUE POINTER USE-CASE
     runCommRoutine();
 
+    std::cout << "================= UNIQUE POINTER EXAMPLE USE CASE II ===================" << std::endl;
+    std::cout << "=== SYSTEM BOOT: DMA PIPELINE RUN ===\n\n";
+
+    dmaReceiverTask();
+    std::cout << "\n--- Queue holds ownership of packet ---\n\n";
+    packetParserTask();
+
+    std::cout << "\n=== DIAGNOSTIC RUN ENDED ===" << std::endl;
+    std::cout << "=====================================================================" << std::endl;
+
     std::cout << "====================================================================\n" << std::endl;
 
     std::cout << "================= SHARED POINTER EXAMPLE USE CASE ===================" << std::endl;
@@ -318,38 +383,6 @@ int main(){
     std::cout << "--- Shutting down system ---\n";
     systemLogger.reset(); // Manually dropping main's ownership. Count hits 0!
     std::cout << "System offline \n";
-
-    std::cout << "====================================================================\n" << std::endl;
-
-    std::cout << "=================== WEAK POINTER EXAMPLE USE CASE ===================" << std::endl;
-    std::cout << "--- Spawning Controller & Motor Loop ---\n";
-
-    auto mainController = std::make_shared<Controller>();   //auto -> std::shared_ptr<Controller>
-    auto rotor1 = std::make_shared<DroneMotor>();           //auto -> std::shared_ptr<DroneMotor>
-
-    // Link them together
-    mainController->m_MotorRef = rotor1;        // Stored inside a shared pointer
-    rotor1->m_ControllerRef = mainController;   // Stored safely inside a Weak Pointer
-
-    std::cout << "Main Controller reference count: " << mainController.use_count() << std::endl;
-    std::cout << "Rotor Motor reference count: " << rotor1.use_count() << std::endl;
-
-    // How to access a weak pointer
-    // You cannot read it directly because the object might have already been deleted.
-    // You must promote it temporarily to a shared_ptr using .lock()
-    if(auto tempControllerShared = rotor1->m_ControllerRef.lock()){
-        std::cout << "[Verification] Motor successfully verified its controller link \n";
-    }
-
-    std::cout << "================= UNIQUE POINTER EXAMPLE USE CASE II ===================" << std::endl;
-    std::cout << "=== SYSTEM BOOT: DMA PIPELINE RUN ===\n\n";
-
-    dmaReceiverTask();
-    std::cout << "\n--- Queue holds ownership of packet ---\n\n";
-    packetParserTask();
-
-    std::cout << "\n=== DIAGNOSTIC RUN ENDED ===" << std::endl;
-    std::cout << "=====================================================================" << std::endl;
 
     std::cout << "================= SHARED POINTER EXAMPLE USE CASE II ===================" << std::endl;
     std::cout << "=== SYSTEM BOOT: IoT WEATHER SNAPSHOT RUN ===\n\n";
@@ -379,6 +412,53 @@ int main(){
     std::cout << "\n=== DIAGNOSTIC RUN ENDED ===" << std::endl;
     std::cout << "========================================================================" << std::endl;
 
+    std::cout << "====================================================================\n" << std::endl;
+
+    std::cout << "=================== WEAK POINTER EXAMPLE USE CASE ===================" << std::endl;
+    std::cout << "--- Spawning Controller & Motor Loop ---\n";
+
+    auto mainController = std::make_shared<Controller>();   //auto -> std::shared_ptr<Controller>
+    auto rotor1 = std::make_shared<DroneMotor>();           //auto -> std::shared_ptr<DroneMotor>
+
+    // Link them together
+    mainController->m_MotorRef = rotor1;        // Stored inside a shared pointer
+    rotor1->m_ControllerRef = mainController;   // Stored safely inside a Weak Pointer
+
+    std::cout << "Main Controller reference count: " << mainController.use_count() << std::endl;
+    std::cout << "Rotor Motor reference count: " << rotor1.use_count() << std::endl;
+
+    // How to access a weak pointer
+    // You cannot read it directly because the object might have already been deleted.
+    // You must promote it temporarily to a shared_ptr using .lock()
+    if(auto tempControllerShared = rotor1->m_ControllerRef.lock()){
+        std::cout << "[Verification] Motor successfully verified its controller link \n";
+    }
+
+    std::cout << "================= WEAK POINTER EXAMPLE USE CASE II ===================" << std::endl;
+    std::cout << "=== SYSTEM BOOT: DRONE TELEMETRY BROADCAST ===\n";
+
+    SensorBroadcaster imuService;
+
+    // Create our graphical screen widget on the stack
+    auto oledScreen = std::make_shared<OledGraphicView>();
+
+    // Register it as a weak observer so we don't hold it hostage in memory
+    imuService.registerObserver(oledScreen);
+
+    // Initial sensor sweep
+    imuService.broadcast(1.2f, -0.4f);
+
+    std::cout << "\n[Simulator] User closes the OLED screen widget...\n";
+    // Deallocate the observer manually by releasing our owner pointer
+    oledScreen.reset(); 
+
+    // Second sensor sweep (Broadcaster detects the observer has departed!)
+    imuService.broadcast(3.4f, -1.8f);
+
+    std::cout << "\n=== SYSTEM SHUTDOWN ===" << std::endl;
+
+    std::cout << "=====================================================================" << std::endl;
+    
     std::cout << "--- Leaving Main Scope ---\n";
     std::cout << "=====================================================================" << std::endl;
     std::cin.get();

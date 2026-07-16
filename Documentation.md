@@ -3647,18 +3647,246 @@ The Modern C++ Solution:
 - The Memory is freed the exact microsecond the slowest thread completes.
 
 ```cpp
+#include <iostream>
+#include <memory>
 
+#include <queue>
+#include <thread>
+#include <utility>
+#include <vector>
+
+struct WeatherSnapshot {
+    float temperature;
+    float humidity;
+    float pressure;
+    uint64_t timestamp_ms;
+
+    WeatherSnapshot(float t, float h, float p, uint64_t ts)
+        : temperature(t), humidity(h), pressure(p), timestamp_ms(ts) {
+        std::cout << "[ALLOC] Snapshot created at " << timestamp_ms << " ms\n";
+    }
+
+    ~WeatherSnapshot() {
+        std::cout << "[FREE] Snapshot deleted cleanly from memory.\n";
+    }
+};
+
+// Simulated tasks running on different threads/cores
+void oledDisplayTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    // Local copy of pointer increments the count
+    std::cout << "[OLED DISPLAY TASK] Weather Snapshot shared pointer count: " << snapshot.use_count() << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Super fast
+    std::cout << "  -> [OLED Task] Updated UI. Temp: " << snapshot->temperature << " C\n";
+}
+
+void sdLoggerTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    std::cout << "[LOGGER TASK] Weather Snapshot shared pointer count: " << snapshot.use_count() << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(30)); // Medium speed
+    std::cout << "  -> [SD Task] Snapshot written to flash log.\n";
+}
+
+void wifiPublisherTask(std::shared_ptr<const WeatherSnapshot> snapshot) {
+    std::cout << "[WIFI PUBLISHER TASK] Weather Snapshot shared pointer count: " << snapshot.use_count() << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(80)); // Slow network delay
+    std::cout << "  -> [WiFi Task] Sent telemetry payload to AWS IoT Cloud.\n";
+}
+
+
+int main() {
+    std::cout << "=== SYSTEM BOOT: IoT WEATHER SNAPSHOT RUN ===\n\n";
+
+    {
+        // 1. Thread spawns a new sensor snapshot
+        std::shared_ptr<const WeatherSnapshot> latestReading = 
+            std::make_shared<const WeatherSnapshot>(24.85f, 62.4f, 1012.3f, 45000ULL);
+
+        std::cout << "Active Owners: " << latestReading.use_count() << "\n\n";
+
+        // 2. Dispatch tasks (In an RTOS, this copies pointers into OS queues)
+        // Here we simulate concurrent execution by passing the shared_ptr to threads
+        std::thread t1(oledDisplayTask, latestReading);
+        std::thread t2(sdLoggerTask, latestReading);
+        std::thread t3(wifiPublisherTask, latestReading);
+
+        // Main loop can immediately drop its local ownership to continue polling sensors
+        latestReading.reset(); 
+        std::cout << "[Main Thread] Dropped local owner pointer. System waiting for tasks...\n\n";
+
+        t1.join();
+        t2.join();
+        t3.join();
+    } 
+
+    std::cout << "\n=== DIAGNOSTIC RUN ENDED ===" << std::endl;
+    return 0;
+}
 ```
 ```text
 Output Log:
+================= SHARED POINTER EXAMPLE USE CASE II ===================
+=== SYSTEM BOOT: IoT WEATHER SNAPSHOT RUN ===
 
+[ALLOC] Snapshot created at 45000 ms
+Active Owners: 1
+
+[Main Thread] Dropped local owner pointer. System waiting for tasks...
+
+[LOGGER TASK] Weather Snapshot shared pointer count: 3
+[OLED DISPLAY TASK] Weather Snapshot shared pointer count: 3
+[WIFI PUBLISHER TASK] Weather Snapshot shared pointer count: 3
+  -> [OLED Task] Updated UI. Temp: 24.85 C
+  -> [SD Task] Snapshot written to flash log.
+  -> [WiFi Task] Sent telemetry payload to AWS IoT Cloud.
+[FREE] Snapshot deleted cleanly from memory.
+
+=== DIAGNOSTIC RUN ENDED ===
+========================================================================
 ```
 
+##### `std::weak_ptr` Use Case: Asynchronous Observer Pattern for Debug Widgets
+Consider a drone or automated robotics hub, it has a central sensors broadcasr service that reads the onboard IMU (Gyroscope & Accelerometer) and broadcasts alerts if an anomalous motion spike or collision risk is detected.
+The System allows debugging tools like an OLED graph widget, a terminal CLI monitor, or a web status dasboard to temporarily register as observer so they can draw data in real-time.
+```text
+       +------------------------------------+
+       |  Central Sensors Broadcaster (IMU) |
+       +-----------------+------------------+
+                         |
+           Broadcaster holds a vector of:
+            std::weak_ptr<IMUObserver>
+                         |
+           Attempts to lock each observer...
+                         |
+             +-----------+-----------+
+             |                       |
+             v                       v
+      +--------------+        +--------------+
+      |  OLED View   |        |   Web View   |
+      | (Still Alive)|        |  (Destroyed) |
+      +--------------+        +--------------+
+       Lock succeeds!          Lock fails.
+        Draws graph.          Cleans up entry.
+```
+The Architectural Problem
+- Observers can be created and destroyed dynamically at runtime. for e.g. a technician might plug in a serial debug monitor, look at a diagnostic screen for 10 seconds, and close it.
+- If the `SensorsBroadcaster` held a standard list of `std::shared_ptr<IMUObserver>`, the observer could never be deleted. The central service would keep a persistent reference, preventing their destructors from ever running (a memory leak!)
+- If the `SensorsBroadcaster` held raw pointers, and a technician closed a debug window, the broadcaster would eventually try to send data to a deallocated memory address, triggering a system crash.
 
+The Modern C++ Solution
+- The Central service maintains a registery of `std::weak_ptr<IMUObserver>`.
+- When the service wants to broadcast, it calls `.lock()` on the observer.
+- If the debug screen still exists, `.lock()` temporarily promotes the pointer to a valid `std::shared_ptr` so the broadcaster can safely transmit metrics.
+
+```cpp
+#include <iostream>
+#include <memory>
+#include <vector>
+#include <algorithm>
+
+// The Interface that debugging widgets must implement
+class IMUObserver {
+public:
+    virtual void onTelemetryUpdate(float pitch, float roll) = 0;
+    virtual ~IMUObserver() = default;
+};
+
+// A concrete Observer (OLED Display view)
+class OledGraphicView : public IMUObserver {
+public:
+    void onTelemetryUpdate(float pitch, float roll) override {
+        std::cout << "  [OLED View] Drawing graph -> Pitch: " << pitch << ", Roll: " << roll << "\n";
+    }
+    ~OledGraphicView() { std::cout << "  [OLED View] Destructor: Widget closed & cleaned up.\n"; }
+};
+
+// The central Broadcaster service
+class SensorBroadcaster {
+private:
+    std::vector<std::weak_ptr<IMUObserver>> m_Observers;
+
+public:
+    void registerObserver(std::weak_ptr<IMUObserver> observer) {
+        m_Observers.push_back(observer);
+        std::cout << "[Broadcaster] New observer registered.\n";
+    }
+
+    void broadcast(float pitch, float roll) {
+        std::cout << "\n[Broadcaster] Broadcasting telemetry payload to registered observers...\n";
+        
+        // Iterate and filter out dead observers
+        auto it = m_Observers.begin();
+        while (it != m_Observers.end()) {
+            // Attempt to promote the weak pointer
+            if (auto sharedObserver = it->lock()) {
+                sharedObserver->onTelemetryUpdate(pitch, roll);
+                ++it;
+            } else {
+                // The observer was destroyed in background! Clean up vector.
+                std::cout << "[Broadcaster] Dead observer detected. Purging from registry...\n";
+                it = m_Observers.erase(it);
+            }
+        }
+    }
+};
+
+int main() {
+    std::cout << "=== SYSTEM BOOT: DRONE TELEMETRY BROADCAST ===\n";
+
+    SensorBroadcaster imuService;
+
+    // Create our graphical screen widget on the stack
+    auto oledScreen = std::make_shared<OledGraphicView>();
+
+    // Register it as a weak observer so we don't hold it hostage in memory
+    imuService.registerObserver(oledScreen);
+
+    // Initial sensor sweep
+    imuService.broadcast(1.2f, -0.4f);
+
+    std::cout << "\n[Simulator] User closes the OLED screen widget...\n";
+    // Deallocate the observer manually by releasing our owner pointer
+    oledScreen.reset(); 
+
+    // Second sensor sweep (Broadcaster detects the observer has departed!)
+    imuService.broadcast(3.4f, -1.8f);
+
+    std::cout << "\n=== SYSTEM SHUTDOWN ===" << std::endl;
+    return 0;
+}
+```
+```text
+Output Log:
+================= WEAK POINTER EXAMPLE USE CASE II ===================
+=== SYSTEM BOOT: DRONE TELEMETRY BROADCAST ===
+[Broadcaster] New Observer registered 
+
+[Broadcaster] Broadcasting telemetry payload to registered observers...
+[OLED View] Drawing graph -> Pitch: 1.2, Roll: -0.4
+
+[Simulator] User closes the OLED screen widget...
+[OLED View] Destructor: Widget closed & cleaned up.
+
+[Broadcaster] Broadcasting telemetry payload to registered observers...
+[Broadcaster] Dead observer detected. Purging from registery...
+
+=== SYSTEM SHUTDOWN ===
+=====================================================================
+```
+
+##### Summary
+
+| Pointer | Who "Owns" the Resource? | Embedded Use Case Example | Hardware Safety Guarantee | Cost/Overhead |
+|:--------|:-------------------------|:--------------------------|:--------------------------|:--------------|
+|`std::unique_ptr`| Exactly one single owner module | A physical UART port, SPI HAL driver, DMA Memory channel, RX packet buffer. | Prevents duplicate driver ini, multi-thread race conditions, and illegal concurrent access | Absolute Zero, Compiles down to a raw pointer |
+|`std::shared_ptr`| Multiple tasks sharing lifetime control | A global DMA log buffer, a static sensor snapshot read by logger + network | Prevents silent memory leaks and "use-after-free" faults between concurrent RTOS Tasks. | Small reference counting tracking block allocated on the heap. |
+|`std::weak_ptr`| Nobody. A safe "spectator". | Cache buffers, observer callbacks, live sensir registers, parent-child nodes | Prevents memory leaks by breaking dynamic circular blocks/observer traps | Extremely tiny (compares against the control block). |
+
+Therefore, smart pointers:
+1. `std::unique_ptr` guarantees safety by making copying illegal (using `std::move` to pass ownership).
+2. `std::shared_ptr` uses shared ownership and reference counting.
+3. `std::weak_ptr` observes a resource safely without owning it.
 
 
 ## Auto Keyword in C++
 - Discusses about the auto keyword and how it can be used in code.
 - Showcases examples of when and when not to use the auto keyword.
 - Discussed the benefits and drawbacks of using the auto keyword.
--  
