@@ -32,6 +32,7 @@ add_subdirectory(Cpp024_strings)
 add_subdirectory(Cpp025_object_lifetime)
 add_subdirectory(Cpp026_smart_pointers)
 add_subdirectory(Cpp027_auto_keyword)
+add_subdirectory(Cpp028_templates)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)
