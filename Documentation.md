@@ -4015,3 +4015,301 @@ This is generally avoided in firmware and systems programming. If a type is obvi
 |`auto* x`          | Explicit pointer deduction.                       | Capturing raw legacy C driver buffers safely.                     | None.                                                     |
 
 ## Templates in C++
+
+### Quick notes
+- Discussed a basic Overview of Template in C++, and compared with macros and a blueprint.
+- Discussed and showed example of defining multiple print functions but with different parameters, which makes the code feel duplicated, and for each type of code, a same function name but with different type is created, which feels very repetitive, code duplication and difficult to maintain the code and make sure each functions does the same work/functionality but with different kind of data type of the input parameter, so that's why the concept of templates exists in C++.
+- Syntax >> `template<typename T>`
+- Example
+```cpp
+template<typename T>
+void Print(T value){}
+
+int main(){
+    Print<std::string>("Hello");
+    Print<int>(7);
+}
+```
+- Discussed that templates are evaluated at compile time.
+- Discussed that template only gets created at compile time, therefore,, any errors in a function which is using the template, will only get caught during the compile time. (Note: this might be compiler dependent)
+- Showcased multiple examples of using templates with arrays, , multi-parameter templates and so on.
+- Discussed about meta programming.
+- Summary: The Cherno introduces C++ templates as a powerful tool for code reuse, demonstrating how to create blueprints for functions and classes that the compiler generates based on usage. The explanation covers type deduction, syntax for single and multiple parameters, and practical examples for reducing code duplication.
+
+
+## Copying & Copy Constructors in C++
+
+### Quick Notes
+- Discusse dabout copying objects, variables and so on in C++, how it might create performance issues because copyoing takes time.
+- Discussed about how copying works in C++, how to get it to copy, how to avoid copy, and when to copy and not is a very important understanding for writting C++ code.
+- Discussed about `friend` keyword.
+- Discussed with example of using the copy constructor of the example class by using the constructor initializer list to assign or by using the constructor with the `this` keyword.
+- Discussed about shallow and deep copy.
+- Summary The Cherno demonstrates how to manage memory efficiently by creating a custom string class to explain shallow versus deep copying. Learn to prevent unnecessary performance overhead and avoid common crashes caused by multiple objects manipulating the same memory address.
+
+### Personal Notes
+Whenever you use the equal sign (`=`) to assign an object to another, or pass an object into a function by value, C++ performs a copy.
+If your class only containsnbasic primitive types(like `int`, `float`, or `bool`), C++'s default copying mechanism works perfectly. It just copies the values over.
+But if your class manage Heap memory (using new & delete), the default copy mechanism becomes a ticking time bomb.
+
+#### The Danger: Shallow Copying & The Double-Free Crash
+Lets look at a custom `string` buffer class to see why C++'s default copy behavior crashes programs.
+When C++ copies an object by default, it does a Shallow Copy. It takes the exact variables from object A and copies them directly into object B. If one of those variables is a memory pointer, it copies the memory address, not the actual text data.
+
+```cpp
+// Topic: Copying and copy constructor
+#include <iostream>
+#include <cstring>
+
+class BadString{
+private:
+    char* m_buffer;
+    int m_size;
+public:
+    BadString(const char* string) {
+        m_size = strlen(string);
+        m_buffer = new char[m_size + 1]; // Ask Heap for memory and +1 for adding null termination
+        memcpy(m_buffer, string, m_size + 1); // Copy text into Heap
+    }
+
+    ~BadString(){
+        delete[] m_buffer; // Automatically free the memory
+    }
+};
+
+int main(){
+    std::cout << "========== TOPIC: Copying & Copy Constructor in C++ ==========\n";
+
+    BadString StringA("Hello");
+
+    // Shallow copy occurs here
+    BadString StringB = StringA;
+
+    std::cout << "==============================================================\n";
+    std::cin.get();
+}
+// CRASH!!! Segmentation fault because of double free!!
+```
+```text
+Output Log:
+aryan@Aryan:~/Workspace/Programming/Cpp/sw-Cpp/build$ ../Cpp028_copying_and_copy_constructor/Cpp028_copying_and_copy_constructor 
+========== TOPIC: Copying & Copy Constructor in C++ ==========
+==============================================================
+
+free(): double free detected in tcache 2
+Aborted                    ../Cpp028_copying_and_copy_constructor/Cpp028_copying_and_copy_constructor
+```
+Why did it crash?
+1. `StringA` allocates memory at address `0x1000` for "Hello".
+2. `StringB = StringA` executes. C++ blindly copies `stringA`'s variables. Now `StringB.m_buffer` also points to `0x1000`.
+3. The `main` function ends.
+4. `StringB`'s destructor runs and executes delete[] 0x1000. The memory is freed.
+5. `StringA`'s destructor runs and executes delete[] 0x1000.
+6. **CRASH**: You cannot free the exact same block of memory twice. The OS kills your program.
+
+#### The Fix: Deep Copying (The Copy Constructor)
+To prevent this, you must intercept the copy process. You must tell C++: "Don't just copy the pointer address! allocate brand new memory, and copy the text over!".
+We do this by writing the Copy Constructor. The signature for a copy constructor is always: `ClassName(const Classname& other)`.
+```cpp
+// Topic: Copying and copy constructor
+#include <iostream>
+#include <cstring>
+
+// If ENABLED(1), then the program will crash because of double free. If DISABLED(0), then the program will run fine.
+#define BAD_COPY_STRING_EXAMPLE     0
+
+class BadString{
+private:
+    char* m_buffer;
+    int m_size;
+public:
+    BadString(const char* string) {
+        m_size = strlen(string);
+        m_buffer = new char[m_size + 1]; // Ask Heap for memory and +1 for adding null termination
+        memcpy(m_buffer, string, m_size + 1); // Copy text into Heap
+    }
+
+    ~BadString(){
+        delete[] m_buffer; // Automatically free the memory
+    }
+};
+
+class GoodString{
+private:
+    char* m_buffer;
+    int m_size;
+public:
+    GoodString(const char* string){
+        m_size = strlen(string);
+        m_buffer = new char[m_size + 1];
+        memcpy(m_buffer, string, m_size + 1); // destination address, source address, total size
+    }
+
+    // The Copy Constructor (deep copy)
+    // 'other' is a reference to the object we are copying FROM.
+    GoodString(const GoodString& other) : m_size(other.m_size) {
+        std::cout << "[Copied String!]" << std::endl;
+        // 1. Ask the Heap for BRAND NEW memory just for this copy
+        m_buffer = new char[m_size + 1];
+        // 2. Copy the actual data bytes from the 'other' buffer into the NEW buffer
+        memcpy(m_buffer, other.m_buffer, m_size + 1);
+    }
+
+    ~GoodString(){
+        delete[] m_buffer;
+    }
+};
+
+int main(){
+    std::cout << "========== TOPIC: Copying & Copy Constructor in C++ ==========\n";
+
+    #if BAD_COPY_STRING_EXAMPLE
+        std::cout << "BAD COPY STRING EXAMPLE\n";
+        BadString StringA("Hello");
+        // Shallow copy occurs here
+        BadString StringB = StringA;
+    #else
+        std::cout << "GOOD COPY STRING EXAMPLE\n";
+        GoodString StringX = "FIFA26";
+        // The Compiler sees the `=` and triggers the copy constructor
+        GoodString StringZ = StringX;
+
+        // Now, StringX is at 0x1000, and StringY is at 0x2000, they now safely delete themeselves! No Crash!
+    #endif
+
+    std::cout << "==============================================================\n";
+    std::cin.get();
+}
+// if ENABLED example, then CRASH!!! Segmentation fault because of double free!!
+// Else, NO Crash!!
+```
+```text
+Output Log:
+aryan@Aryan:~/Workspace/Programming/Cpp/sw-Cpp/build$ ../Cpp028_copying_and_copy_constructor/Cpp028_copying_and_copy_constructor 
+========== TOPIC: Copying & Copy Constructor in C++ ==========
+GOOD COPY STRING EXAMPLE
+[Copied String!]
+==============================================================
+
+```
+
+#### The `Friend` Keyword
+In the below example, we will need to use the frienc keyword, because we need to use `std::cout << StringX` to print the string.
+Since `operator<<` is a global function, not a member function. Therefore, it is not allowed to access `private` variables like `m_buffer`.
+So by declaring the global function as a `friend` inside the class, you are giving it a VIP pass to access private memory.
+```cpp
+// Topic: Copying and copy constructor
+#include <iostream>
+#include <cstring>
+
+// If ENABLED(1), then the program will crash because of double free. If DISABLED(0), then the program will run fine.
+#define BAD_COPY_STRING_EXAMPLE     0
+
+class BadString{
+private:
+    char* m_buffer;
+    int m_size;
+public:
+    BadString(const char* string) {
+        m_size = strlen(string);
+        m_buffer = new char[m_size + 1]; // Ask Heap for memory and +1 for adding null termination
+        memcpy(m_buffer, string, m_size + 1); // Copy text into Heap
+    }
+
+    ~BadString(){
+        delete[] m_buffer; // Automatically free the memory
+    }
+};
+
+class GoodString{
+private:
+    char* m_buffer;
+    int m_size;
+public:
+    GoodString(const char* string){
+        m_size = strlen(string);
+        m_buffer = new char[m_size + 1];
+        memcpy(m_buffer, string, m_size + 1); // destination address, source address, total size
+    }
+
+    // The Copy Constructor (deep copy)
+    // 'other' is a reference to the object we are copying FROM.
+    GoodString(const GoodString& other) : m_size(other.m_size) {
+        std::cout << "[Copied String!]" << std::endl;
+        // 1. Ask the Heap for BRAND NEW memory just for this copy
+        m_buffer = new char[m_size + 1];
+        // 2. Copy the actual data bytes from the 'other' buffer into the NEW buffer
+        memcpy(m_buffer, other.m_buffer, m_size + 1);
+    }
+
+    // VIP PASS: "I allow this specific external function to read my private variables"
+    friend std::ostream& operator<<(std::ostream& stream, const GoodString& string);
+
+    ~GoodString(){
+        delete[] m_buffer;
+    }
+};
+
+// Now this external function can legally access string.m_buffer
+std::ostream& operator<<(std::ostream& stream, const GoodString& string){
+    stream << string.m_buffer;
+    return stream;
+}
+
+int main(){
+    std::cout << "========== TOPIC: Copying & Copy Constructor in C++ ==========\n";
+
+    #if BAD_COPY_STRING_EXAMPLE
+        std::cout << "BAD COPY STRING EXAMPLE\n";
+        BadString StringA("Hello");
+        // Shallow copy occurs here
+        BadString StringB = StringA;
+    #else
+        std::cout << "GOOD COPY STRING EXAMPLE\n";
+        GoodString StringX = "FIFA26";
+        // The Compiler sees the `=` and triggers the copy constructor
+        GoodString StringZ = StringX;
+
+        std::cout << "StringX: " << StringX << ", StringZ (Copied): " << StringZ << std::endl;
+
+        // Now, StringX is at 0x1000, and StringY is at 0x2000, they now safely delete themeselves! No Crash!
+    #endif
+
+    std::cout << "==============================================================\n";
+    std::cin.get();
+}
+```
+```text
+Output Log:
+aryan@Aryan:~/Workspace/Programming/Cpp/sw-Cpp/build$ ../Cpp028_copying_and_copy_constructor/Cpp028_copying_and_copy_constructor 
+========== TOPIC: Copying & Copy Constructor in C++ ==========
+GOOD COPY STRING EXAMPLE
+[Copied String!]
+StringX: FIFA26, StringZ (Copied): FIFA26
+==============================================================
+
+```
+
+#### Performance: Avoiding the Copy Entirely
+Now that you know how copying works and how expensive it is (calling `new`, searching the Heap, calling memcpy), you should realize you almost never want to copy objects if you can avoid it.
+If you pass an object into a function by Value, C++ triggers the Copy Constuctor.
+```cpp
+// BAD: This creates a full, slow Deep Copy on the Heap every time you call it!
+void printString(GoodString text) {
+    std::cout << text << std::endl;
+}
+
+// GOOD: Pass-by-Const-Reference. 
+// Passes an 8-byte pointer address. The Copy Constructor is NEVER called!
+void printString(const GoodString& text) {
+    std::cout << text << std::endl;
+}
+```
+
+#### The Firmware Rule of Thumb
+If you write a class that handles dynamic memory (Heap, DMA buffers, Hardware FIFOs), you usually want to explicitly ban copying so no one accidently clones a hardware driver.
+You can do this by deleting the copy constructor!
+```cpp
+// No one can ever copy this object. The compiler will block the build.
+GoodString(const GoodString& other) = delete; 
+```
