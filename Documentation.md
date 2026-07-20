@@ -4014,28 +4014,6 @@ This is generally avoided in firmware and systems programming. If a type is obvi
 |`auto& x`          | Takes a writable reference.                       | Modifying a specific sensor state or database record in-place.    | Absolutely Zero.                                          |
 |`auto* x`          | Explicit pointer deduction.                       | Capturing raw legacy C driver buffers safely.                     | None.                                                     |
 
-## Templates in C++
-
-### Quick notes
-- Discussed a basic Overview of Template in C++, and compared with macros and a blueprint.
-- Discussed and showed example of defining multiple print functions but with different parameters, which makes the code feel duplicated, and for each type of code, a same function name but with different type is created, which feels very repetitive, code duplication and difficult to maintain the code and make sure each functions does the same work/functionality but with different kind of data type of the input parameter, so that's why the concept of templates exists in C++.
-- Syntax >> `template<typename T>`
-- Example
-```cpp
-template<typename T>
-void Print(T value){}
-
-int main(){
-    Print<std::string>("Hello");
-    Print<int>(7);
-}
-```
-- Discussed that templates are evaluated at compile time.
-- Discussed that template only gets created at compile time, therefore,, any errors in a function which is using the template, will only get caught during the compile time. (Note: this might be compiler dependent)
-- Showcased multiple examples of using templates with arrays, , multi-parameter templates and so on.
-- Discussed about meta programming.
-- Summary: The Cherno introduces C++ templates as a powerful tool for code reuse, demonstrating how to create blueprints for functions and classes that the compiler generates based on usage. The explanation covers type deduction, syntax for single and multiple parameters, and practical examples for reducing code duplication.
-
 
 ## Copying & Copy Constructors in C++
 
@@ -4313,3 +4291,213 @@ You can do this by deleting the copy constructor!
 // No one can ever copy this object. The compiler will block the build.
 GoodString(const GoodString& other) = delete; 
 ```
+
+## Templates in C++
+
+### Quick notes
+- Discussed a basic Overview of Template in C++, and compared with macros and a blueprint.
+- Discussed and showed example of defining multiple print functions but with different parameters, which makes the code feel duplicated, and for each type of code, a same function name but with different type is created, which feels very repetitive, code duplication and difficult to maintain the code and make sure each functions does the same work/functionality but with different kind of data type of the input parameter, so that's why the concept of templates exists in C++.
+- Syntax >> `template<typename T>`
+- Example:
+    ```cpp
+    template<typename T>
+    void Print(T value){}
+
+    int main(){
+        Print<std::string>("Hello");
+        Print<int>(7);
+    }
+    ```
+- Discussed that templates are evaluated at compile time.
+- Discussed that template only gets created at compile time, therefore,, any errors in a function which is using the template, will only get caught during the compile time. (Note: this might be compiler dependent)
+- Showcased multiple examples of using templates with arrays, , multi-parameter templates and so on.
+- Discussed about meta programming.
+- Summary: The Cherno introduces C++ templates as a powerful tool for code reuse, demonstrating how to create blueprints for functions and classes that the compiler generates based on usage. The explanation covers type deduction, syntax for single and multiple parameters, and practical examples for reducing code duplication.
+
+### Personal Notes
+If Polymorphism (using virtual functions) is how C++ achieves runtime flexibility, Templates are how C++ achieves compile-time flexibility.
+
+Templates allow you to write generic blueprint for functions and classes that work with any data type. The Compiler then acts as a code generator, automatically writing the exact, type-safe versions of the code you actually use in your program.
+
+#### Function Templates: The Basics
+In C, if you want a function to find the maximum of two numbers, you have to write it for every single data type you plan to use.
+```cpp
+// The tedious, procedural C way
+int max_int(int a, int b) { return (a > b) ? a : b; }
+float max_float(float a, float b) { return (a > b) ? a : b; }
+```
+In C++, you write a Template Blueprint once:
+```cpp
+#include <iostream>
+
+// 1. Declare the template and define a placeholder typename 'T'
+template <typename T>
+T get_max(T a, T b) {
+    return (a > b) ? a : b;
+}
+
+int main() {
+    // 2. The Compiler sees this and physically generated get_max(int, int)
+    int highest_int = get_max<int>(5, 10);
+    std::cout << "Highest Integer: " << highest_int << std::endl;
+
+    // 3. The Compiler generates get_max(float, float)
+    float highest_float = get_max<float>(7.7f, 10.10f);
+    std::cout << "Highest Float: " << highest_float << std::endl;
+
+    // 4. Implicit Deduction: You can usually drop the <type> brackets entirely!
+    double highest_double = get_max(99.9, 100.1);
+    std::cout << "Highest Double: " << highest_double << std::endl;
+    
+    return 0;
+}
+```
+```text
+aryan@Aryan:~/Workspace/Programming/Cpp/sw-Cpp/build$ ../Cpp029_templates/Cpp029_templates 
+============ TOPIC: TEMPLATES IN C++ ============
+Highest Integer: 10
+Highest Float: 10.1
+Highest Double: 100.1
+=================================================
+```
+
+**The Compile-time Reality (No Overhead!)**
+
+It is critical to understand that templates have absolute zero runtime overhead. When the compiler sees `get_max<int>(5, 10);`, it physically writes a new function into your assembly code that takes an `int`. it is exactly as fast as if you had written the `int` function by hand.
+
+#### Class Templates (The STL Foundations)
+Function Templates are useful, but Class Templates are where C++ gets its power. The entire C++ Standard Template Library (STL) - including `std::vector`, `std::array`, and `std::string` - is built on this concept.
+Instead of hardcoding a `RingBuffer` to only hold `uint8_t` bytes, you can make the entire class generic.
+```cpp
+// Templates in C++
+#include <iostream>
+
+// The Blueprint for a generic buffer
+template <typename T>
+class Buffer{
+private:
+    T* data;
+    int size;
+public:
+    Buffer(int s) : size(s) {
+        data = new T[size]; // Allocates memory for whatever 'T' is.
+        std::cout << "[BUFFER CONSTRUCTOR] BUFFER INSTANTIATED!\n";
+    }
+
+    ~Buffer(){
+        delete[] data;
+        std::cout << "[BUFFER DESTRUCTOR] BUFFER DESTROYED!\n";
+    }
+
+    void write(int index, T value){
+        if(index < size){
+            std::cout << "[BUFFER] Write Valid! Writing data to buffer!\n";
+            data[index] = value;
+        }
+    }
+
+    T read(int index) const {
+        std::cout << "[BUFFER] Read Valid!, Reading data from buffer!\n";
+        return data[index];
+    }
+};
+
+int main(){
+    std::cout << "============ TOPIC: TEMPLATES IN C++ ============" << std::endl;
+
+    // Instantiating a Buffer designed specifically for floats
+    Buffer<float> temp_sensor_log(10);
+    temp_sensor_log.write(0, 2.45f);
+    std::cout << "Validating Buffer Data at index 0: \n" << temp_sensor_log.read(0) << std::endl; 
+
+    // Instantiating a Buffer designed specifically for chars
+    Buffer<char> uart_rx_buffer(256);
+    uart_rx_buffer.write(0, 'A');
+    std::cout << "Validating Buffer Data at Index 0: \n" << uart_rx_buffer.read(0) << std::endl;
+
+    std::cout << "=================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+aryan@Aryan:~/Workspace/Programming/Cpp/sw-Cpp/build$ ../Cpp029_templates/Cpp029_templates 
+============ TOPIC: TEMPLATES IN C++ ============
+[BUFFER CONSTRUCTOR] BUFFER INSTANTIATED!
+[BUFFER] Write Valid! Writing data to buffer!
+Validating Buffer Data at index 0: 
+[BUFFER] Read Valid!, Reading data from buffer!
+2.45
+[BUFFER CONSTRUCTOR] BUFFER INSTANTIATED!
+[BUFFER] Write Valid! Writing data to buffer!
+Validating Buffer Data at Index 0: 
+[BUFFER] Read Valid!, Reading data from buffer!
+A
+=================================================
+
+[BUFFER DESTRUCTOR] BUFFER DESTROYED!
+[BUFFER DESTRUCTOR] BUFFER DESTROYED!
+```
+
+**The Firmware Rule for Class Templates**
+
+Unlike function templates, you cannot rely on implicit deduction for class templates (prior to C++17). you must always specify the type in angle brackets when instantiating the object (e.g. `Buffer<float> my_buffer();`).
+
+#### Template Parameters
+Templates don't just have to take data types (`typename T`). they can also take constant values evaluated at compile-time. This is heavily used in firmware to create static, heap-free arrays like `std::array<int, 5>`.
+
+```cpp
+// T is the data type, N is the exact size of the array
+template <typename T, size_t N>
+class StaticArray {
+private:
+    T m_Data[N]; // The compiler knows 'N', so this sits cleanly on the Stack!
+
+public:
+    int getSize() const { return N; }
+};
+
+int main(){
+    std::cout << "============ TOPIC: TEMPLATES IN C++ ============" << std::endl;
+
+    // Generate a class with an internal float array of size 100
+    StaticArray<float, 100> temp_readings;
+    float length = temp_readings.get_size();
+    std::cout << "Temperature Reading Static Array Size: " << length << std::endl;
+
+    // Generate a completely different class with an int array of size 5
+    StaticArray<int, 5> status_flags;
+    int flag_array_length = status_flags.get_size();
+    std::cout << "Status Flag Static Array Size: " << flag_array_length << std::endl;
+
+    std::cout << "=================================================" << std::endl;
+    std::cin.get();
+}
+```
+```text
+Output Log:
+aryan@Aryan:~/Workspace/Programming/Cpp/sw-Cpp/build$ ../Cpp029_templates/Cpp029_templates 
+============ TOPIC: TEMPLATES IN C++ ============
+Temperature Reading Static Array Size: 100
+Status Flag Static Array Size: 5
+=================================================
+```
+
+#### The Compilation Trap (Header Files)
+When you write normal C++ code, you declare your functions in an `.h` file and write the logic in a `.cpp` file.
+You cannot do this with templates. Because template is a just a blueprint (not real code), the compiler cannot compile it into a `.o` object file.
+The compiler needs to see the entire template logic at the exact moment you call `get_max<int>()` so it knows how to generate code.
+
+**The Golden Rule:** Template declarations AND definitions must both be placed entirely inside the **Header File** (`.h` or `.hpp`). if you try to put template logic in `.cpp` file, you will get Catastrophic Linker Errors (`underfined reference`).
+
+#### Firmware Reality: Code bloat & Metaprogramming
+**The Code Bloat Warning**
+1. Because templates generate a brand new copy of the class for every single type you use, they can drastically increase the size of your code final `.bin` file.
+2. if you use `Buffer<int>`, `Buffer<float>`, and `Buffer<uint8_t>`, the compiler generates three complete copies of the `Buffer` class in Flash memory.
+3. Firmware Advice: Use templates to solve structural problems (like making a generic `CircularQueue`), but don't go crazy instantiating it with 15 different data types if flash memory is tight.
+
+**Template Metaprogramming (advanced)**
+
+At the highest level of C++ systems engineering, developers use templates to force the compiler to do the math during compilation instead of at runtime. This generates code with zero runtime cost, and is often used to map hardware registers directly to C++ types using `static_assert` to guarantee memory safety before the code ever runs on the hardware.
+
+---
