@@ -4500,4 +4500,265 @@ The compiler needs to see the entire template logic at the exact moment you call
 
 At the highest level of C++ systems engineering, developers use templates to force the compiler to do the math during compilation instead of at runtime. This generates code with zero runtime cost, and is often used to map hardware registers directly to C++ types using `static_assert` to guarantee memory safety before the code ever runs on the hardware.
 
+## Casting in C++
+
+### Quick Notes
+- Discusses about implicit & Explicit conversions and Casting Concept in C & C++
+- Discusses examples on implicit casting and explicit casting using C style & C++ Style.
+- Discusses about static cast, reinterpret cast, dynamic cast, and const cast in C++.
+- Discusses between C style and C++ Style casting.
+- Discusses a bit about type pruning.
+- Discussed examples on static cast, dynamic cast, reinterpret cast, and const cast in C++.
+- Discusses on RTTI in C++
+
+### Personal Notes
+In C, you only have one way to cast types: the C Style cast `(Type)value`. In C++, Casting is divided into four distinct operations. This forces the programmer to declare their exact intention, making the code safer and making it much easier to search a massive codebase for dangerous hardware level casts (e.g. by searching for `_cast`).
+
+#### Implicit VS Explicit Conversion
+In Implicit Conversion, the compiler does this automatically when it is 100% safe or standard. e.g.g promoting an `int` to a `float`, or upcasting a derived class pointer to a base class pointer.
+
+In Explicit Conversion, you tell the compiler to convert the type, even if it loses data. e.g. forcing a `float` into an `int`, cutting off the decimals.
+
+**Why avoid C-Style Casts in C++?**
+
+A C Style cast `(int*)ptr` acts like a sledgehammer. the compiler will try a `static_cast`, and if that fails, it will silently downgrade to a highly dangerous `reinterpret_cast`. In C++, you should always use the named cast so the compiler can block you if you make a logical mistake.
+
+#### `static_cast` (The Workhorse)
+Use `static_cast` for standard, well-defined conversions between compatible types. It performs checks at compile-time. The common use cases would be Converting primitive math types, and converting generic `void*` context pointers back into real struct pointers (heavily used in RTOS tasks and hardware callbacks).
+```cpp
+// Topic: Casting in C++
+#include <iostream>
+
+// 2. RTOS Callback Conversion
+struct SensorContext{
+    int id;
+};
+
+// A generic callbacks signature common in FreeRTOS or pthread
+void onSensorInterrupt(void* raw_context) {
+    // We KNOW this void* is actually a SensorContext*
+    // static_cast safely bridges it back at compile-time.
+    SensorContext* ctx = static_cast<SensorContext*>(raw_context);
+    std::cout << "Interrupt on sensor: " << ctx->id << std::endl;
+}
+
+int main(){
+    std::cout << "========== Topic: Casting in C++ ==========\n";
+
+    // 1. Primitive Conversion
+    float battery_voltage = 12.6f;
+    int truncated_volts = static_cast<int>(battery_voltage);    // Safe, drops the .6
+    
+    SensorContext data = {15};
+    void* ptr = &data;
+    onSensorInterrupt(ptr);
+
+    std::cout << "===========================================\n";
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== Topic: Casting in C++ ==========
+Interrupt on sensor: 15
+===========================================
+```
+
+#### `reinterpret_cast` (The Hardware Hacker)
+Use `reinterpret_cast` when you need to bypass the C++ type system entirely. It tells the compiler i.e. Treat this exact sequence of bits as a completely different type.
+
+Common firmware use cases: memory mapped hardware registers, since you know the exact physical silicon address of a register, and you need to force a C++ pointer to look at it.
+```cpp
+// Topic: Casting in C++
+#include <iostream>
+#include <cstdint>
+
+#define MOCK_UART_HARDWARE  1
+
+struct UartRegisters{
+    uint32_t STATUS;
+    uint32_t DATA;
+};
+
+int main(){
+    std::cout << "========== Topic: Casting in C++ ==========\n";
+
+    #if MOCK_UART_HARDWARE
+        UartRegisters mock_uart_hardware;
+        UartRegisters* uart1 = &mock_uart_hardware;
+        std::cout << "UART1 Physical BASE ADDRESS: " << std::hex << uart1 << std::endl;
+        uart1->DATA = 0xDEADBEEF; // We are now writting directly to hardware!
+        uint32_t data_value = static_cast<uint32_t>(uart1->DATA);
+        std::cout << "Value at DATA Register of the UART Peripheral: 0x" << data_value << std::endl;
+    #else
+        // The Datasheet says UART1 starts at hardware address 0x40011000
+        const uint32_t UART1_BASE_ADDR = 0x40011000;
+        // Force a C++ pointer to point to raw physical silicon
+        UartRegisters* uart1 = reinterpret_cast<UartRegisters*>(UART1_BASE_ADDR);
+        std::cout << "UART1 Physical BASE ADDRESS: " << std::hex << uart1 << std::dec << std::endl;
+    #endif
+
+    std::cout << "===========================================\n";
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== Topic: Casting in C++ ==========
+Interrupt on sensor: 15
+UART1 Physical BASE ADDRESS: 0x7ffc3c66aef0
+Value at DATA Register of the UART Peripheral: 0xdeadbeef
+===========================================
+```
+
+#### Type Punning (The Danger of `reinterpret_cast`)
+Type Punning is the act of taking a block of memory and reading it as a completely different data types. For example, receiving 4 raw bytes over a UART serial port and reading them as a `float`.
+
+In C, programmers used `union` or raw pointers for this. In C++, doing this with `reinterpret_cast` technically violates a compiler optimization rule called **Strict Aliasing**.
+If you use `reinterpret_cast` to alias two incompatible types, the compiler's optimizer might delete or reorder your code, causing catastrophic bugs.
+
+The Modern C++ Solution via `std::memcpy` or `std::bit_cast`:
+To safely type-pun without undefined behavior, you must copy the bytes. Modern compilers recognize this pattern and optimize the copy away completely, giving you 100% speed with 100% safety.
+
+```cpp
+#include <cstring>
+#include <bit> // C++20
+
+void parseNetworkPayload(uint8_t* payload) {
+    // DANGER: Strict Aliasing Violation! Might break on high optimization (-O3)
+    // float temp = *reinterpret_cast<float*>(payload); 
+
+    // SAFE C++11 Way: memcpy
+    float safe_temp;
+    std::memcpy(&safe_temp, payload, sizeof(float)); 
+
+    // SAFE C++20 Way: std::bit_cast (The ultimate modern standard)
+    // float modern_temp = std::bit_cast<float>(*payload);
+}
+
+```
+
+#### `const_cast` (The API Bridge)
+`const_cast` is the only cast allowed to remove or add `const` or `volatile` qualifiers.
+Warning: you should almost never use this to modify the variable that was actually declared `const`. Doing so causes a hard crash. You use `const_cast` strictly to interface with badly-written C APIs that dont use `const` correctly.
+
+```cpp
+// Topic: Casting in C++
+#include <iostream>
+#include <cstdint>
+#include <cstring>
+
+// CONST CAST EXAMPLE
+
+// A leagcy C Library Function that you can't edit.
+// It doesn't modify the string, but the author forgot to write const char*
+void legacy_c_print(char* text){
+    std::cout << text << std::endl;
+}
+
+void my_modern_cpp_print(const std::string& msg){
+    // legacy_c_print(msg.c_str()); // COMPILER ERROR: Loses const qualifier
+    // Therefore, we strip the const away just to satisfy the compiler, knowing the C function is safe.
+    legacy_c_print(const_cast<char*>(msg.c_str()));
+}
+
+int main(){
+    std::cout << "========== Topic: Casting in C++ ==========\n";
+
+    const std::string name = "Cristiano Ronaldo";
+    my_modern_cpp_print(name);
+
+    std::cout << "===========================================\n";
+    std::cin.get();
+}
+```
+```text
+Output log:
+Cristiano Ronaldo
+```
+
+#### `dynamic_cast` and RTTI
+`dynamic_cast` is used to safely cast up and down an inheritance tree (Polymorphism). If you have a `Peripheral*` base pointer, and you wnat to safely check if it is actually pointing to an `SPI*` object, you use `dynamic_cast`. if it fails, it returns `nullptr`.
+
+Critical Requirement: `dynamic_cast` only works on polymorphic classes. The base class must have at least one `virtual` function (even if it is just a virtual destructor) for the compiler to generate the necessary type tracking data.
+
+**Example: Safe Downcasting:** Imagine a System managing different types of vehicles. You have a list of generic `Vehicle` pointers, but you need to perform a specific action that only applies to a `Truck`.
+
+```cpp
+// Topic: Casting in C++
+#include <iostream>
+#include <cstdint>
+
+// ========== DYNAMIC CAST EXAMPLE ============
+class Vehicle {
+public:
+    // A Virtual destructor makes the class polymorphic!
+    virtual ~Vehicle() = default;
+};
+
+class Car : public Vehicle {};
+
+class Truck : public Vehicle {
+public:
+    void loadCargo(){
+        std::cout << "Loading heavy cargo into the truck!\n";
+    }
+};
+
+
+// ========== MAIN FUNCTION ============
+
+int main(){
+    std::cout << "========== Topic: Casting in C++ ==========\n";
+
+    /* Dynamic Cast Example - Safe Downcasting */
+    // We have a Base Pointer, but it actually holds a Truck
+    Vehicle* myVehicle = new Truck();
+
+    // We try to safely "downcast" it to a Truck pointer
+    Truck* myTruck = dynamic_cast<Truck*>(myVehicle);
+
+    // ALWAYS check if dynamic_cast succeeded before using the pointer!
+    if(myTruck){
+        std::cout << "Successfully verified it is a Truck.\n";
+        myTruck->loadCargo();   // Safe to call derived methods
+    }
+    else{
+        std::cout << "Cast failed! This is not a Truck.\n";
+    }
+
+    // What if we try to cast it to a Car?
+    Car* myCar = dynamic_cast<Car*>(myVehicle);
+    if(!myCar){
+        std::cout << "Correctly failed to cast a Truck into a Car. Returns nullptr.\n";
+    }
+
+    delete myVehicle;
+
+    std::cout << "===========================================\n";
+    std::cin.get();
+}
+```
+```text
+========== Topic: Casting in C++ ==========
+Successfully verified it is a Truck.
+Loading heavy cargo into the truck!
+Correctly failed to cast a Truck into a Car. Returns nullptr.
+===========================================
+```
+
+Safe Downcasting is taking a generic base pointer (like `Vehicle*`) and trying to convert it into a derived pointer (like `Truck*`).
+
+Safe Upcasting is taking a pointer to a specific, derived object (like a `Truck`) and converting it into a pointer of its more generic, base class (like a `Vehicle`).
+
+**The Mechanism: RTTI:** To make dynamic_cast work, the C++ compiler injects Run-Time Type Information (RTTI) into your binary. It essentially attaches a hidden string (like `"SPI_Driver"`) and type-hierarchy metadata to the VTable of every polymorphic class.
+
+**The Firmware Cost (Why it is banned in embedded systems)**
+
+While `dynamic_cast` is fantastic for desktop applications and necessary for many high-level architectures, it is often considered toxic in bare-metal microcontrollers (STM32, ESP32, etc.).
+- Flash Bloat: RTTI strings and metadata consume massive amounts of ROM/Flash memory.
+- CPU Latency: `dynamic_cast` does not execute instantly. It must traverse the VTable tree at runtime, matching string names. This takes a wildly unpredictable amount of CPU cycles.
+- Because of this, embedded firmware compiles with the flag `-fno-rtti`. This disables `dynamic_cast` entirely.
+- Note: If you are using a Base pointer in firmware, you should architect your system so that you never need to know the specific Derived type (that is the entire point of Virtual Functions!). If you absolutely must know the type, you should implement your own lightweight, integer-based ID system (often called an Enum Type Tag) instead of paying the massive memory cost of RTTI.
+
 ---
