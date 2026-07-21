@@ -4910,4 +4910,122 @@ Let's read it from the inside out:
 If you are mapping a C++ struct directly over hardware registers, and the hardware manual says the voltage register is at an offset of 0x08, you can use offsetof (which relies on this arrow mechanism) to static_assert that your struct was packed correctly by the compiler!
 
 
---- 
+## Dynamic Arrays in C++
+
+### Quick notes
+- Discussed about the standard vector class in C++, standard template library in C++, and that standard template library is filled with containers and so on.
+- Discussed and showcased examples of using the `std::vector` with normal use cases and with pointers & references.
+- Summary: The Cherno introduces the standard vector class as a dynamic array solution within the C++ Standard Template Library. Learn how to declare, add elements to, iterate through, and remove data from these versatile containers, along with best practices for efficient memory usage.
+
+### Personal Notes
+The `std::vector` is the workhorse of modern C++. It is dynamically resizing array. Under the hood, a vector guarantees that all its elements are stored in contiguous memory (exactly like a C array). This means iterating through the Vector is incredibly fast and cache friendly for the CPU.
+
+#### The Core Mechanics: Size vs Capacity
+To master `std::vector`, you must understand the difference between its Size and its Capacity. Size(`.size()`) is the actual number of elements currently stored in the vector and the Capacity (`.capacity()`) is the amount of physical heap memory the vector has currently allocated.
+
+When you add data to a vector and its Size exceeds its Capacity, the vector performs a Reallocation:
+1. It asks the OS for a brand new, larger block of heap memory (usually 1.5x or 2x the old size).
+2. It physically copies (or moves) every single element from the old memory block to the new one.
+3. It deletes the old memory block.
+
+```cpp
+// Topic: Dynamic Arrays in C++
+#include <iostream>
+#include <vector>
+
+int main(){
+    std::cout << "========== TOPIC: Dynamic Arrays in C++ ==========\n";
+    
+    // Example: The Reallocation Penalty
+    std::vector<int> sensor_data;
+    // Size: 0, Capacity: 0
+    
+    sensor_data.push_back(10);  // vector allocates memory for 1 item
+    // Size: 1, Capacity: 1
+    std::cout << "Size of the sensor_data vector: " << sensor_data.size() << std::endl;
+    std::cout << "Capacity of the sensor_data vector: " << sensor_data.capacity() << std::endl;
+    std::cout << "All Elements in the Vector: ";
+    for(int i=0; i < sensor_data.size() ; i++){
+        std::cout << sensor_data[i] << " ";
+    }
+    std::cout << std::endl;
+
+    sensor_data.push_back(20);  // vector is full, It allocates space for 2 items, copies the '10', and deletes the old memory.
+    // Size: 2, Capacity: 2
+    std::cout << "Size of the sensor_data vector: " << sensor_data.size() << std::endl;
+    std::cout << "Capacity of the sensor_data vector: " << sensor_data.capacity() << std::endl;
+    std::cout << "All Elements in the Vector: ";
+    for(int i=0; i < sensor_data.size() ; i++){
+        std::cout << sensor_data[i] << " ";
+    }
+    std::cout << std::endl;
+
+    sensor_data.push_back(30);  // Full again! allocates space for 4 items, copies 10 & 20...
+    // Size: 3, Capacity: 4
+    std::cout << "Size of the sensor_data vector: " << sensor_data.size() << std::endl;
+    std::cout << "Capacity of the sensor_data vector: " << sensor_data.capacity() << std::endl;
+    std::cout << "All Elements in the Vector: ";
+    for(int i=0; i < sensor_data.size() ; i++){
+        std::cout << sensor_data[i] << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "==================================================\n";
+    std::cin.get();
+}
+```
+```text
+Output Log:
+========== TOPIC: Dynamic Arrays in C++ ==========
+Size of the sensor_data vector: 1
+Capacity of the sensor_data vector: 1
+All Elements in the Vector: 10 
+Size of the sensor_data vector: 2
+Capacity of the sensor_data vector: 2
+All Elements in the Vector: 10 20 
+Size of the sensor_data vector: 3
+Capacity of the sensor_data vector: 4
+All Elements in the Vector: 10 20 30 
+==================================================
+```
+
+**Firmware Note:** Reallocation is increadibly slow. If you are logging 10,000 sensor readings in a fast loop, you do not want the vector to pause and reallocate memory 15 different times!
+
+#### The Golden Optimization: `.reserve()`
+If you have a rough idea of how much data you are going to process, you should always use `.reserve()` before pushing data. This tells the vector to allocate the Heap memory exactly once, preventing all future reallocations.
+
+```cpp
+void processNetworkPayload(int expected_bytes){
+    std::vector<uint8_t> rx_buffer;
+
+    // OPTIMIZATION: We ask the OS for memory exactly once!
+    rx_buffer.reserve(expected_bytes);
+
+    uint8_t count = 7;
+    
+    for(int i=0; i < expected_bytes ; i++){
+        // becasue of .reserve(), this is now as fast as writing to a raw C array!
+        rx_buffer.push_back(count++);
+    }
+
+    std::cout << "All Elements in the Vector: ";
+    for(int i=0; i < expected_bytes ; i++){
+        std::cout <<static_cast<int>(rx_buffer[i]) << " ";
+    }
+    std::cout << std::endl;
+}
+
+int main(){
+    std::cout << "========== TOPIC: Dynamic Arrays in C++ ==========\n";
+
+    processNetworkPayload(15);
+
+    std::cout << "==================================================\n";
+    std::cin.get();
+}
+```
+```text
+========== TOPIC: Dynamic Arrays in C++ ==========
+All Elements in the Vector: 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 
+==================================================
+```
