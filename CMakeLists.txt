@@ -35,6 +35,7 @@ add_subdirectory(Cpp027_auto_keyword)
 add_subdirectory(Cpp028_copying_and_copy_constructor)
 add_subdirectory(Cpp029_templates)
 add_subdirectory(Cpp030_casting)
+add_subdirectory(Cpp031_arrow_operator)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)
