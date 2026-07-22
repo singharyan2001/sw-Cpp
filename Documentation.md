@@ -5297,4 +5297,140 @@ Optimization implemented below, therefore no copies will be printed below
 ==================================================
 ```
 
+## LValues & RValues in C++
+
+### Quick Notes
+- Discussed what exactly are LValues and RValues in C++
+- Discussed and showcased examples of explaining LValues and RValues
+- Discussed about LValue Reference and RValue Reference in C++
+- Discusses that "you cannot take an LValue reference from an Rvalue.
+- Discussed about `const int& a = 10;` & `void print(const int& value)` examples.
+- Discussed about Rvalue reference and `<type>&&`, e.g. `void PrintName(std::string&& name)`.
+- Discussed why this is usefull? and especially with move semantics.
+- Explaination Note: When we know that we will be taking in a temporary object in an argument, we can simply steal the resource that might be attached to that specific object and use that somewhere else because we know its temporary and its not going to exists for very long.
+- Discusses that LValues are basically variables that have some kind of storage backing the and RValues are temp values, LValue references can only take in LValues, unless they are const and RValues references only take in these temp values.
+- Summary: The Cherno breaks down the concepts of lvalues and rvalues in C++, explaining how they function and why understanding them is essential for advanced features like move semantics. The lesson covers how to differentiate between temporary and persistent data to optimize code efficiently.
+
+### Personal Notes
+Before C++11, C++ had a performance problem. When you passed temporary objects (like the result of a math equation or a string literal) around in memory, the compiler was often forced to make deep, slow copies of them, only to immediately destroy the temporary object a microsecond later.
+
+To fix this, C++ formalized LValues and RValues, giving programmers the ability to tell the compiler: "Hey, this data is about to die anyway. Don't copy it, just steal its memory."
+
+#### The Basic Definitions
+The simplest wat to remember them is to think about the left and right sides of an equals sign (`=`).
+
+**LValue (Locator Value):** It represents an object that occupies a persistent, identifiable location in memory (It has a memory address), Because it has an address, it can appear on the left side of an equals sign.
+
+**RValue (Read Value):** An RValue is a temporary, short lived expression that does not have a persistent memory address. since it's just a value, it can only appear on the right side of an equal sign.
+
+```cpp
+int main() {
+    int i = 10; 
+    // 'i' is an LValue (it has a memory address on the stack).
+    // '10' is an RValue (it is just a temporary literal value).
+    
+    // 10 = i; // COMPILER ERROR: You cannot assign to an RValue!
+    
+    int a = i; // OK: Assigning an LValue to an LValue
+    
+    int b = (i + 5); 
+    // (i + 5) is an RValue. It calculates '15' in the CPU register, 
+    // assigns it to 'b', and then the '15' instantly ceases to exist.
+}
+```
+
+#### LValue References (`&`)
+An LValue Reference is just a pseudonym for an exisiting memory address. Therefore, an LValue reference can only bind to an LValue.
+
+```cpp
+void processValue(int& value) { /* ... */ }
+
+int main() {
+    int x = 50;
+    
+    processValue(x); // SUCCESS: 'x' is an LValue.
+    
+    // processValue(50); // ERROR: Cannot bind a non-const LValue reference to an RValue!
+}
+```
+
+Why does it fail? because `processValue` is asking for the memory address of the input so it can potentially modify it, but `50` is just a temporary number in a CPU register, it doesn't have a persistent RAM Address!.
+
+#### The Savior: `const` LValue References
+If you promise not to modify the data by using `const`, the C++ compiler will bend the rules for you. Therefore if you bind a `const LValue reference` to an RValue, the compiler silently creates a temporary variable on the stack for you, assign the RValue to it and passes that temporary address.
+
+```cpp
+// Works for BOTH LValues and RValues!
+void printValue(const int& value) { 
+    std::cout << value << "\n";
+}
+
+int main() {
+    int x = 50;
+    printValue(x);  // OK: LValue
+    printValue(50); // OK: RValue (Compiler secretly makes a temp variable for '50')
+}
+```
+
+#### RValue References (`&&`)
+Introduced in C++11, an RValye Reference uses a double ampersand (`&&`). It does the exact opposite of an LValue reference, It ONLY binds to RValues (temporary data).
+
+```cpp
+// This function ONLY accepts temporary, dying data
+void processTemp(int&& value) {
+    std::cout << "Processing temporary: " << value << "\n";
+}
+
+int main() {
+    int x = 10;
+    // processTemp(x); // ERROR: 'x' is an LValue. 
+    
+    processTemp(200); // SUCCESS: '200' is an RValue.
+    processTemp(x + 5); // SUCCESS: '(x+5)' evaluates to a temporary RValue.
+}
+```
+
+#### Why is this useful? (Function Overloading)
+By using `&&`, we can write two different versions of the same function. The compiler will automatically detect if the user passed in persistent data or temporary data, and choose the most optimized path!
+
+```cpp
+// Imagine we are writing a function that stores text in a database
+#include <iostream>
+#include <string>
+
+// VERSION 1: LValue Reference Overload
+// The user passed us a persistent string (like a variable they plan to use again).
+// We MUST perform a slow, Deep Copy to respect their ownership.
+void storeData(const std::string& text) {
+    std::cout << "[LVALUE DETECTED] Doing a slow deep copy of: " << text << "\n";
+    // ... allocate memory, run memcpy, etc.
+}
+
+// VERSION 2: RValue Reference Overload
+// The user passed us a temporary string (like "Immediate Log").
+// We know this string is going to be destroyed the millisecond this function ends.
+void storeData(std::string&& text) {
+    std::cout << "[RVALUE DETECTED] Stealing the heap pointer of: " << text << "\n";
+    // ... we don't copy the bytes! We just rip the pointer out of 'text' 
+    // and claim the memory for ourselves!
+}
+
+int main() {
+    std::string myLog = "Sensor Read";
+    
+    // The compiler sees 'myLog' is an LValue. It calls Version 1.
+    storeData(myLog); 
+    
+    // The compiler sees a raw literal being converted to a temporary string. 
+    // It is an RValue! It calls Version 2 for maximum speed!
+    storeData("Direct Warning"); 
+}
+```
+
+#### Prepping for `std::move`
+You have just seen how we can steal memory from temporary objects (RValues).
+But what if you have an LValue (like `myLog` in the example above), and you want the compiler to steal it? What if you are completely finished using `myLog`, and you want to hand its memory over to `storeData` without doing a slow Deep Copy?
+
+That is exactly what `std::move` does. It temporarily casts an LValue into an RValue, tricking the compiler into calling the highly optimized && function overload!
+
 ---
