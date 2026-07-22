@@ -5433,4 +5433,12 @@ But what if you have an LValue (like `myLog` in the example above), and you want
 
 That is exactly what `std::move` does. It temporarily casts an LValue into an RValue, tricking the compiler into calling the highly optimized && function overload!
 
----
+
+## `std::move` Semantics in C++
+
+### Quick Notes
+- Discussed about `std::move` Semantics and how it works.
+- Discussed the use cases of `std::move` Semantics and what kind of problems it helps to avoid.
+- Discussed how `std_move` improves the performance and helps us write code with zero-copy functionality.
+- Discussed `std::move` and move constructor.
+- Discussed an implemented example where the object was created and then copied and then object was printed (object is string) and the main intention of the example was to implement `std:move` Semantics to remove the copy phase, therefore to make this entire functionality or process be Zero-Copy.
