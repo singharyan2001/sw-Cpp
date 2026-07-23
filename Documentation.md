@@ -5713,4 +5713,11 @@ Data: 0xaa
 
 ```
 
----
+## Function Pointers in C++
+
+### Quick Notes
+- Discussed about function pointers, how they work and how to create function pointers using C-Style based typedef.
+- Discussed about Creating function pointers by using auto, and typedef to create function pointers.
+- Discussed & Showed examples of creating and call function pointers
+- Discussed & Showed examples of using function pointers that go through the elements of a vector and also passing functions as arguments.
+- **Summary:** The Cherno introduces raw function pointers in C++, demonstrating how to assign functions to variables, pass them as parameters, and utilize the auto keyword. This fundamental C-style approach sets the stage for advanced C++ features like lambdas and modern functional programming techniques.
