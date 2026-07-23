@@ -5434,11 +5434,283 @@ But what if you have an LValue (like `myLog` in the example above), and you want
 That is exactly what `std::move` does. It temporarily casts an LValue into an RValue, tricking the compiler into calling the highly optimized && function overload!
 
 
-## `std::move` Semantics in C++
+## `move` Semantics & std::move in C++
 
-### Quick Notes
-- Discussed about `std::move` Semantics and how it works.
-- Discussed the use cases of `std::move` Semantics and what kind of problems it helps to avoid.
-- Discussed how `std_move` improves the performance and helps us write code with zero-copy functionality.
+### Quick Notes [Move Semantics]
+- Discussed about move Semantics and how it works.
+- Discussed the use cases of move Semantics and what kind of problems it helps to avoid.
+- Discussed how move Semantics improves the performance and helps us write code with zero-copy functionality.
 - Discussed `std::move` and move constructor.
-- Discussed an implemented example where the object was created and then copied and then object was printed (object is string) and the main intention of the example was to implement `std:move` Semantics to remove the copy phase, therefore to make this entire functionality or process be Zero-Copy.
+- Discussed an implemented example where the object was created and then copied and then object was printed (object is string) and the main intention of the example was to implement move Semantics to remove the copy phase, therefore to make this entire functionality or process be Zero-Copy.
+- **Summary:** The Cherno demonstrates how to implement move semantics in C++ using a custom string class example. The tutorial covers creating move constructors to avoid expensive deep copies, improving performance by transferring ownership of heap-allocated memory instead of duplicating it.
+
+## Quick Notes [`std::move` & `move` assignment operator]
+- Discussed about `std::move`, what it is and when we need to use it and why?
+- Discussed about the move assignment operator, what it is and when we need to use it and why?
+- Discussed and showcased some examples on using the move constructor, std::move, and move assignment operator.
+- Discussed about what will happen if we try to assign an object to itself using the move operator and also showed the solution to handle such a scenario (`this != &other`).
+- Discussed examples of using `std::move` and move assignment operator.
+- Mention something about rule of third and rule of fifth.
+- Discussed about using std::move, when you want to convert an object to a temporary so that the new object can steal its resources.
+- **Summary:** The Cherno demonstrates how to implement the move assignment operator and utilize std::move for existing objects in C++. This guide covers efficiently transferring resources between objects to enhance performance and ensure proper memory management.
+
+### Personal Notes - Move Semantics & `std::move` in C++: The Zero-Copy Architecture
+In C++, whenever you pass a complex object (like a large `std::vector` or a custom string) into a function by value, or assign it to a new variable, the compiler performs a Deep Copy.
+It allocates brand new Heap memory and painstakingly copies every single byte.
+
+If you are dealing with a 10KB network packet, copying it across three different queues takes massive amounts of CPU time and fragments your RAM.
+
+Move Semantics allows us to bypass the deep copy entirely. If we know the source object is temporary and about to die (an RValue), we can just "steal" its pointer and clain the memory for overselves!.
+
+#### The Rule of Five
+Before modern C++ (C++11), developers followed the Rule of Three: If your class manually manages memory (using `new`), you must implement three things to prevent crashes and leaks:
+1. Destructor (to free memory)
+2. Copy Constructor (To deep-copy memory during intialization)
+3. Copy Assignment Operator (To deep-copy memory during variable reassignment)
+
+With the introduction of Move Semantics, this evolved into the Rule of Five. To make your class highly optimized and fully modern, therefore you also need to add:
+1. Move Constructor (To-steal memory during initialization)
+2. Move Assignment Operator (To-steal memory during reassignment)
+
+#### The Embedded Firmware Example: A Heavy DMA Payload
+Imagine a hardware DMA controller dumps a large chunk of telemetry data into RAM. We wrap it in a `DmaPayload` object.
+
+##### The Move Constructor (Initialization Stealing)
+The Move Constructor is triggered when we construct a new object from a temporary dying object (an RValue reference `&&`).
+
+Instead of allocating new memory, we simply point out `m_buffer` to the dying object's memory.
+
+**Crucial Step:** We MUST set the dying object's `m_buffer` to `nullptr`!. If we don't, when the dying object's destructor runs a microsecond later, it will execute `delete[] m_buffer` and destroy the memory we just stole!
+
+##### The Move Assignment Operator (`operator=`)
+This is triggered when both objects already exists, but we want to overwrite one with the contents of a dying temporary object.
+Because our target object is already exists, it might already own its own heap memory.
+We must delete our current memory before stealing the new memory.
+
+##### Final Example Code with Output
+```cpp
+// TOPIC: move Semantics in C++
+#include <iostream>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+
+// EXAMPLE: EMBEDDED USE CASE: DMA PLAYLOAD [ZERO-DEEP COPY NEEDS TO BE PERFORMED]
+class DmaPayload {
+private:
+    uint8_t* m_buffer;
+    size_t m_size;
+public:
+    // 1. Standard Constructor
+    DmaPayload(size_t size) : m_size(size) {
+        m_buffer = new uint8_t[m_size];
+        std::cout << "[ALLOC] Allocated: " << m_size << " bytes on Heap" << std::endl;
+    }
+
+    // 2. Destructor
+    ~DmaPayload() {
+        delete[] m_buffer;
+        std::cout << "[FREE] Destroyed payload." << std::endl;
+    }
+
+    // 3. Copy Constructor (Slow Deep Copy)
+    DmaPayload(const DmaPayload& other) : m_size(other.m_size) {
+        m_buffer = new uint8_t[m_size];
+        memcpy(m_buffer, other.m_buffer, m_size);
+        std::cout << "[COPY] Performed slow deep copy." << std::endl;
+    }
+
+    // 4. Move Constructor (Zero-Copy)
+    // 'noexcept' tells the compiler this operation cannot throw errors, unlocking further optimizations
+    DmaPayload(DmaPayload&& other) noexcept 
+        : m_size(other.m_size), m_buffer(other.m_buffer)    // Steal the pointers/values
+    {
+        std::cout << "[MOVE CONSTRUCTOR] Stole memory pointer!" << std::endl;
+        
+        // Neutralize the source object so its destructor doesn't kill our stolen memory!
+        other.m_buffer = nullptr;
+        other.m_size = 0;
+    }
+
+    // 5. Move Assignment Operator
+    DmaPayload& operator=(DmaPayload&& other) noexcept {
+        std::cout << "[MOVE ASSIGNMENT] Overwriting existing object" << std::endl;
+
+        // WARNING: Self-Assignment Check!
+        // What if someone types: myPayload = std::move(myPayload);
+        // If we didn't check for this, we would delete our own memory, then try to steal from it.
+        if(this != &other){
+            // A. Clean up our current memory
+            delete[] m_buffer;
+            
+            // B. Steal the data
+            m_size = other.m_size;
+            m_buffer = other.m_buffer;
+            
+            // C. Neutralize the source
+            other.m_buffer = nullptr;
+            other.m_size = 0;
+        }
+        return *this;
+    }
+};
+
+
+int main(){
+    std::cout << "============ TOPIC: move Semantics in C++ =============\n";
+
+    std::cout << "====== Embedded Firmware Example: Heavy DMAPAYLOAD with Zero-Copy ======\n";
+
+    std::cout << "------ Creating Payload A ------\n";
+    DmaPayload PayloadA(1024);  // Allocate 1024 bytes
+
+    std::cout << "\n------ Copying to Payload B (slow) ------\n";
+    // PayloadA is an LValue (persistent). This triggers the Slow Copy Constructor
+    DmaPayload PayloadB = PayloadA;
+
+    std::cout << "\n------ Moving to Payload C (Fast) ------\n";
+    // We are completely done with payloadA. We cast it to a temporary using std::move
+    // This triggers the Zero-Copy Move Constructor
+    DmaPayload PayloadC = std::move(PayloadA);
+
+    // IMPORTANT: At this exact moment, PayloadA is just an empty shell.
+    // Its internal pointer is nullptr. You must NEVER try to read from payloadA again!
+
+    std::cout << "\n------ Reassigning Payload B ------\n";
+    DmaPayload tempPayload(512);
+
+    // PayloadB already exists. We use std::move to trigger the Move Assignment Operator!
+    PayloadB = std::move(tempPayload);
+
+    std::cout << "\n------ End of Scope Cleanup ------\n";
+    std::cout << "========================================================================\n";
+    std::cin.get();
+}
+```
+```text
+Output Log:
+--- Creating Payload A ---
+[ALLOC] Allocated 1024 bytes on Heap.
+
+--- Copying to Payload B (Slow) ---
+[ALLOC] Allocated 1024 bytes on Heap.
+[COPY] Performed slow deep copy.
+
+--- Moving to Payload C (Fast!) ---
+[MOVE CONSTRUCTOR] Stole memory pointer!
+
+--- Reassigning Payload B ---
+[ALLOC] Allocated 512 bytes on Heap.
+[MOVE ASSIGNMENT] Overwriting existing object.
+[FREE] Destroyed payload.    <-- (This happens because payloadB deleted its old 1024 byte memory before stealing the 512 bytes!)
+
+--- End of Scope Cleanup ---
+[FREE] Destroyed payload.    <-- (payloadB deleting the 512 bytes it stole)
+[FREE] Destroyed payload.    <-- (payloadC deleting the 1024 bytes it stole)
+[FREE] Destroyed payload.    <-- (tempPayload deleting nullptr safely)
+[FREE] Destroyed payload.    <-- (payloadA deleting nullptr safely)
+```
+
+#### The Modern ApproachL Smart Pointers and The "Rule of Zero"
+In the previous examples, we manually wrote the Destructor, Move Constructor, and Move Assignment operators. We did this because we were dealing with raw pointers (`uint8_t* m_Buffer`) and had to manually execute `delete[]` and `nullptr` assignments.
+
+In Modern C++, we avoid raw `new` and `delete`. If we rewrite our `DmaPayload` to use a `std::unique_ptr` instead of raw pointer, we achieve the Rule of Zero.
+
+If a clas sonly manages memory through standard smart pointers and STL containers, you do not need to write any move or destruct logic. The compiler does it all automatically!
+
+```cpp
+// TOPIC: move Semantics in C++
+#include <iostream>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+
+// EXAMPLE: The Modern Approach: Smart Pointers and The "Rule of Zero"
+class SmartDmaPayload {
+private:
+    // The Smart Pointer automatically deletes memory and neutralizes itself on move!
+    std::unique_ptr<uint8_t[]> m_buffer;
+    size_t m_size;
+public:
+    // Only the Constructor is needed!
+    SmartDmaPayload(size_t size) : m_size(size) {
+        m_buffer = std::make_unique<uint8_t[]>(m_size);
+        std::cout << "[ALLOC] Smart DMA payload created.\n";
+    }
+    // RULE OF ZERO: No Destructor, No Copy logic, No Move logic required!
+    // The compiler automatically figures out how to move unique_ptrs.
+
+    // Overload the [] Operator to forward the Index to the smart pointer
+    uint8_t& operator[](size_t index){
+        // Bound Checks!
+        if(index >= m_size){
+            std::cout << "[ERROR[ OUT OF BOUNDS ACCESS - RETURNING WITH LAST ELEMENT INDEX\n";
+            return m_buffer[m_size];
+        }
+        return m_buffer[index];
+    }
+};
+
+
+int main(){
+    std::cout << "============ TOPIC: move Semantics in C++ =============\n";
+    std::cout << "====== Embedded Firmware Example: The Modern Approach with Heavy DMAPAYLOAD with Zero-Copy ======\n";
+
+    SmartDmaPayload PayloadX(256);
+
+    // COMPILER ERROR!
+    // unique_ptr cannot be copied, so the compiler safely prevents accidental Deep Copies!
+    // SmartDmaPayload PayloadY = PayloadX;
+
+    // SUCCESS! Fast, Zero-Copy transfer!
+    // The Compiler automatically moves the unique_ptr and copies the size variable.
+    SmartDmaPayload PayloadZ = std::move(PayloadX);
+
+    // Write Complete Buffer
+    for(int i=0; i < 20; i++){
+        PayloadZ[i] = 0xAA;
+    }
+
+    // Read Complete Buffer
+    for(int x=0; x < 20; x++){
+        uint8_t data = PayloadZ[x];
+        std::cout << "Data: 0x" << std::hex << static_cast<int>(data) << std::dec << std::endl;
+    }
+
+    // unique_ptr automatically cleans up the 2048 bytes!
+
+    std::cout << "==================================================================================================\n";
+    std::cin.get();
+}
+```
+```text
+Output Log:
+[100%] Built target Cpp034_move_semantics
+============ TOPIC: move Semantics in C++ =============
+====== Embedded Firmware Example: The Modern Approach with Heavy DMAPAYLOAD with Zero-Copy ======
+[ALLOC] Smart DMA payload created.
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+Data: 0xaa
+==================================================================================================
+
+```
+
+---

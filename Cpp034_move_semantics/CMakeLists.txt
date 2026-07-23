@@ -2,10 +2,10 @@
 file(GLOB SOURCES "src/*.cpp")
 
 # 2. Define the executable using those source files
-add_executable(Cpp034_std_move ${SOURCES})
+add_executable(Cpp034_move_semantics ${SOURCES})
 
 # 3. Tell the compiler where your header files (.h / .hpp) live
-target_include_directories(Cpp034_std_move PRIVATE inc)
+target_include_directories(Cpp034_move_semantics PRIVATE inc)
 
 # 4. Route the executable back to the folder
-set_target_properties(Cpp034_std_move PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+set_target_properties(Cpp034_move_semantics PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
