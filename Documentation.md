@@ -5890,4 +5890,162 @@ If you want `emergencyStop` to have access to a local variable (like a specified
 
 This exact limitation is what C++ solved by introducing Lambdas.
 
+## Lambdas in C++
+
+### Quick Notes
+- Discussed about lambdas concept, how to use it and when to use it.
+- Discussed about lambda syntax and how to use each field in the syntax as specified in the CppReference.
+- Discussed lambdas with examples to demonstrate the use of lambdas.
+- **Summary:** The Cherno demonstrates how to define and use anonymous functions within C++ code for quick, disposable functionality. Learn to utilize syntax like captures and parameters to pass variables into these functions, building upon previous knowledge of function pointers.
+
+### Personal Notes
+A Lambda Expression (or lambda for short) is a way to write an anonymous, inline function exactly at the location where it is going to be used.
+For a systems engineer, Lambdas solve the biggest flaw of C-Style function pointers: State Capture.
+
+#### The Anatomy of a Lambda
+The Syntax of a Lambda looks a bit strange at first, but it is highly structured.
+```text
+[capture](parameters) -> return_type {body}
+```
+1. `[captures]`: The most important part. Defines which variables from the surrounding local scope the lambda is allowed to "see" and use inside the body.
+2. `(parameters)`: Just like a normal function (e.g. `int x, float y`)
+3. `-> return_type`: (Optional) The Compiler can usually deduce what the lambda returns automatically. You rarely need to type this.
+4. `{ body }`: The actual code to execute.
+
+#### Basic Usage (No Capture)
+If your lambda doesn't need any local variables, you leave the capture brackets empty `[]`.
+
+Notice that we use the `auto` keyword to store the lambda. Because lambdas are anonymous, the compiler generates a secret, unnameable type for them. `auto` is mandatory here.
+
+```cpp
+#include <iostream>
+
+int main() {
+    // Define the lambda and store it in a variable
+    auto printWarning = [](int errorCode) {
+        std::cout << "[WARNING] System error code: " << errorCode << "\n";
+    };
+
+    // Call it exactly like a normal function!
+    printWarning(404);
+    
+    return 0;
+}
+```
+
+#### The Superpower: The Capture Block
+Let's look at a scenario where a raw C-style function pointer fails. We want to filter an array of sensor readings, but the limit isn't hardcoded; it's a local variable.
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <algorithm> // For std::count_if
+
+int main() {
+    std::vector<int> sensor_readings = {10, 25, 40, 55, 80};
+    
+    // A local variable set by the user or a config file
+    int alarm_threshold = 50; 
+
+    // THE LAMBDA
+    // We put 'alarm_threshold' inside the [] brackets.
+    // The lambda takes a 'reading' as a parameter.
+    auto isDanger = [alarm_threshold](int reading) {
+        return reading > alarm_threshold; 
+    };
+
+    // std::count_if automatically passes each element of the vector into our lambda!
+    int danger_count = std::count_if(sensor_readings.begin(), sensor_readings.end(), isDanger);
+
+    std::cout << "Readings above " << alarm_threshold << ": " << danger_count << "\n";
+    
+    return 0;
+}
+```
+
+**Capture Modes Explained**
+
+You can capture variables by Value (making a copy) or by Reference (pointing to the original).
+1. [x]: Capture variable `x` by value (read-only copy).
+2. [&x]: Capture variable `x` by reference (can modify the original).
+3. [=]: Capture everything in the surrounding scope by value.
+4. [&]: Capture everything in the surrounding scope by reference.
+5. [this]: Capture the current class instance pointer (allows the lambda to call other class methods).
+
+#### Embedded Use Case: Asynchronous Hardware Callbacks
+In modern embedded C++ (and networking frameworks like gRPC), we use `std::function` to store callbacks instead of raw function pointers.
+
+`std::function` is a modern C++ wrapper that is capable of holding lambdas with captures!
+
+Let's build a mock Drone Motor controller. We want a button press to trigger an emergency stop, but we want the interrupt to access our specific Motor object.
+
+```cpp
+#include <iostream>
+#include <functional> // Required for modern callbacks
+
+// ==========================================
+// LOW-LEVEL HAL 
+// ==========================================
+class GpioDriver {
+private:
+    // std::function replaces the old void(*)()
+    std::function<void()> m_callback = nullptr;
+
+public:
+    void attachInterrupt(std::function<void()> cb) {
+        m_callback = cb;
+    }
+
+    void simulateHardwareTrigger() {
+        if (m_callback) m_callback();
+    }
+};
+
+// ==========================================
+// HIGH-LEVEL APPLICATION
+// ==========================================
+class Motor {
+public:
+    void cutPower() { std::cout << "[MOTOR] Power cut. Rotors stopped.\n"; }
+};
+
+int main() {
+    GpioDriver estopPin;
+    Motor leftRotor;
+
+    // We write the callback INLINE.
+    // We capture '&leftRotor' by reference so the lambda can command the motor!
+    estopPin.attachInterrupt( [&leftRotor]() {
+        std::cout << "[INTERRUPT] E-Stop button pressed!\n";
+        leftRotor.cutPower();
+    });
+
+    std::cout << "Drone flying...\n";
+    
+    // Hardware voltage changes...
+    estopPin.simulateHardwareTrigger();
+
+    return 0;
+}
+```
+```text
+Drone flying...
+[INTERRUPT] E-Stop button pressed!
+[MOTOR] Power cut. Rotors stopped.
+```
+
+#### What is the Compiler Actually Doing? (Under the Hood)
+For a systems engineer, it is critical to know that there is no "magic" here.
+
+When you write a lambda with captures, the C++ compiler physically writes a brand new, hidden `class` in the background. It places your captured variables as `private` members of that class, creates a constructor to initialize them, and overloads the `operator()` to hold your code.
+
+This means a Lambda with captures takes up RAM!. If you capture a `std::vector` by value `[myVector]`, the compiler will do a slow, deep heap copy of the entire vector into the hidden lambda class.
+
+**Firmware Rule:** Almost always capture large objects by reference `[&myVector]` to avoid hidden memory allocations!
+
+#### The Danger: Dangling References
+If you capture a local variable by reference `[&]`, and you pass that lambda to a background thread or a hardware timer, you must ensure the local variable outlives the lambda.
+
+If the function ends, the local variable is destroyed, but the background thread still has a lambda pointing to that dead memory address. When the timer fires, the lambda will execute and instantly crash your system (Undefined Behavior).
+
 ---
