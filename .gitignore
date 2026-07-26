@@ -42,3 +42,4 @@ Testing/
 # Build files
 build/
 bin/
+Xpp001_unix_sockets/build/
