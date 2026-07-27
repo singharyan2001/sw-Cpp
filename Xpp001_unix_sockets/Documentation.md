@@ -24,3 +24,7 @@ On the Server Side, there are three things needed to be done for setting up a se
 - `bind()` call takes in a given file descriptor, which tells the kernel to associate it with a given IP and port. To explain in an Analogy way, it basicaly makes a reservation at a restraurant.
 - `listen()` call takes a file descriptor that has been binded to a IP/port, which communicates with the  OS that you want to start receiving connections.
 - `accept()` call takes in a file descriptor that has already been activated via listen(), creates a new File Descriptor (FD) that can be used to communicate with an individual client. by default, this call blocks until a client shows up. To explain in an analogy, the OS tells that the client can enter the store, then the shopkeeper (application code) can talk directly to that individual client.
+
+## Other Resources
+1. https://medium.com/swlh/getting-started-with-unix-domain-sockets-4472c0db4eb1
+2. To add new resources here!!
