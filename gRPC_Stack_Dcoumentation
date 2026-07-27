@@ -1,0 +1,41 @@
+# gRPC Stack Documentation
+
+The gRPC stack comprises of three components i.e. UDS or TCP/IP, gRPC, and Protobuf.
+
+## Roadmap / Plan
+To master this stack, tackle the concepts in this specific order:
+- **Phase 1: Protocol Buffers (The Data Definition):** Before you can send commands, you must define the data. You will learn a new syntax that is independent of C++.
+    - The `.proto` Syntax: Learn how to define `message` blocks (like C structs).
+    - Scalar Types: Understand Protobuf types (`int32`, `float`, `string`) and how they map to C++ types (`int32_t`, `float`, `std::string`).
+    - The `protoc` Compiler: Learn how to manually run the Protobuf compiler in your terminal to generate the `.pb.cc` and `.pb.h` files from your `.proto` file.
+- **Phase 2: gRPC Services (The Action Definition):** Once your data is defined, you define the actions (the Remote Procedure Calls).
+    - Service Definitions: Learn how to add a `service` block inside your `.proto` file.
+    - Unary RPCs: The basic "Call and Response" (e.g., Client requests sensor data, Server replies with a single message).
+    - Streaming RPCs (Optional but powerful): Learn Server Streaming (Client sends one request, Server continuously sends data back) which is excellent for telemetry.
+- **Phase 3: The Build System (The Hardest Part):** Do not try to compile gRPC manually with g++. It requires linking dozens of libraries.
+    - CMake Integration: Learn how to use `find_package(gRPC)` and `find_package(Protobuf)`.
+    - Custom Commands: Learn the CMake commands that automatically invoke protoc whenever you change your `.proto` file, so the C++ headers are generated seamlessly during the build process.
+- **Phase 4: C++ Implementation (The Stubs):** This is where you write your actual firmware logic.
+    - Server Implementation: Learn how to inherit from the auto-generated gRPC base class (e.g., `Dockstack::Service`) and override its virtual functions to implement your logic.
+    - Client Implementation: Learn how to instantiate a Stub (a local proxy object) and call its methods.
+- **Phase 5: Tying it to Unix Domain Sockets:** This is the final, easy step.
+    - Learn the specific gRPC API calls to swap the default TCP transport for your UDS transport:
+        - Server: `builder.AddListeningPort("unix:///tmp/dock.sock", grpc::InsecureServerCredentials());`
+        - Client: `grpc::CreateChannel("unix:///tmp/dock.sock", grpc::InsecureChannelCredentials());`
+
+## Recommended Learning Resources
+- The Official Route (Start Here)
+    - **grpc.io C++ Basics Tutorial:** This is the gold standard. It walks you through building a `RouteGuide` application. Do not skip this. It forces you to write the `.proto` file, configure CMake, and write the C++ client/server.
+    - **How to use it:** Follow it exactly as written (which uses TCP). Once it works, change the connection strings to `unix:///tmp/routeguide.sock` to prove your UDS knowledge.
+- Video Playlist (Youtube)
+    - **CodeToCode — "gRPC C++ Tutorial":** This channel has a phenomenal, step-by-step playlist specifically for gRPC in C++. They dedicate entire videos to the CMake setup, writing the `.proto` file, and implementing Unary and Streaming RPCs.
+    - **Hussein Nasser — "gRPC Crash Course":** While not purely C++, Hussein is a master at explaining backend engineering and networking. Watch his gRPC crash course to understand the why behind HTTP/2 framing, Protobuf binary encoding, and multiplexing before you write the code.
+- Udemy Course (for reference/concept learning)
+    - gRPC [Golang] Master Class: Build Modern API & Microservices
+    - gRPC [Java] Master Class: Build Modern API & Micro services
+    - gRPC Mastery: High-Performance Client-Server Communication
+- Other Courses
+    - https://www.educative.io/courses/introduction-to-grpc?utm_campaign=brand_educative&utm_source=google&utm_medium=ppc&utm_content=performance_max_india&utm_term=&aff=K3Zq&utm_term=&utm_campaign=%5BNew%5D+Performance+Max&utm_source=adwords&utm_medium=ppc&hsa_acc=5451446008&hsa_cam=18931439518&hsa_grp=&hsa_ad=&hsa_src=x&hsa_tgt=&hsa_kw=&hsa_mt=&hsa_net=adwords&hsa_ver=3&gad_source=1&gad_campaignid=18924941403&gbraid=0AAAAADfWLuTsPRcvTtYNlrh9gfKkW_IFX&gclid=CjwKCAjwgO7RBhBKEiwAZNP85nSeYncC0jw4jF-lK1LDJhyFAYJML3h7NR9vq46YGWYjXILXW5gDehoCgXQQAvD_BwE
+    - 
+
+---
