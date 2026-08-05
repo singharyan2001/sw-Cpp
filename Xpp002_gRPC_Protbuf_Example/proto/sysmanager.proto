@@ -1,0 +1,93 @@
+// Specify the syntax version
+syntax = "proto3";
+
+// Create a namespace for generated C++ classes
+package sysmanager;
+
+// ================================================
+// ENUMS
+// ================================================
+enum SystemState {
+    SYSTEM_STATE_UNSPECIFIED = 0;
+    SYSTEM_STATE_BOOTING = 1;
+    SYSTEM_STATE_IDLE = 2;
+    SYSTEM_STATE_ACTIVE = 3;
+    SYSTEM_STATE_FAULT = 4;
+}
+
+// ================================================
+// EXAMPLE 01 : UNARY MESSAGES
+// ================================================
+// 1. Define the Data Structures (Messages)
+message StatusRequest{
+    string component_name = 1;
+}
+
+message StatusResponse{
+    bool is_online = 1;
+    string current_state = 2;
+}
+
+message EnclosureControlRequest{
+    int32 action = 1; // e.g. 1 = Open, 2 = Close
+}
+
+message EnclosureControlResponse{
+    int32 status = 1;
+}
+
+// ================================================
+// EXAMPLE 02: SERVER STREAMING MESSAGES (Telemetry)
+// ================================================
+message WeatherRequest{
+    int32 frequency_ms = 1;
+}
+
+message WeatherTelemetry{
+    float wind_speed = 1;
+    float temperature = 2;
+}
+
+// ================================================
+// EXAMPLE 03: CLIENT STREAMING MESSAGES (Firmware Upload)
+// ================================================
+message FirmwareChunk{
+    int32 chunk_index = 1;
+    string data_payload = 2; // Simulated byte Array
+}
+
+message UploadResult{
+    int32 total_bytes_received = 1;
+}
+
+// ================================================
+// EXAMPLE 04: BIDIRECTIONAL STREAMING MESSAGES (Control Loop)
+// ================================================
+message MotorCommand{
+    float target_position = 1;
+}
+
+message MotorTelemetry{
+    float current_position = 1;
+    bool is_moving = 2;
+}
+
+// ================================================
+// SERVER DEFINITION
+// ================================================
+
+// Define the Actions (Service)
+service SystemManager{
+    // UNARY RPCs: One request, one response.
+    rpc GetSystemStatus (StatusRequest) returns (StatusResponse);
+    rpc TriggerEnclosureControl (EnclosureControlRequest) returns (EnclosureControlResponse);
+
+    // SERVER STREAMING: Returns a stream of data
+    rpc StreamWeatherTelemetry (WeatherRequest) returns (stream WeatherTelemetry);
+
+    // CLIENT STREAMING: Accepts a stream of Data
+    rpc UploadFirmware (stream FirmwareChunk) returns (UploadResult);
+
+    // BIDIRECTIONAL STREAMING: Both sides stream
+    rpc ActiveMotorControl (stream MotorCommand) returns (stream MotorTelemetry);
+}

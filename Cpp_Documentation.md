@@ -5611,7 +5611,7 @@ Output Log:
 [FREE] Destroyed payload.    <-- (payloadA deleting nullptr safely)
 ```
 
-#### The Modern ApproachL Smart Pointers and The "Rule of Zero"
+#### The Modern Approach: Smart Pointers and The "Rule of Zero"
 In the previous examples, we manually wrote the Destructor, Move Constructor, and Move Assignment operators. We did this because we were dealing with raw pointers (`uint8_t* m_Buffer`) and had to manually execute `delete[]` and `nullptr` assignments.
 
 In Modern C++, we avoid raw `new` and `delete`. If we rewrite our `DmaPayload` to use a `std::unique_ptr` instead of raw pointer, we achieve the Rule of Zero.

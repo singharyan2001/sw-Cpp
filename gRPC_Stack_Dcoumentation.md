@@ -22,6 +22,8 @@ The gRPC stack comprises of three components i.e. UDS or TCP/IP, gRPC, and Proto
   - [gRPC Core Concepts](#grpc-core-concepts)
     - [Channel](#channel)
     - [Lifecycle](#lifecycle)
+  - [Setting up](#setting-up)
+    - [Linux](#linux)
 
 
 ## Roadmap / Plan
@@ -74,7 +76,25 @@ In gRPC, communication between a client and a server happens over a network conn
 
 HTTP/2 provides multiple improvements features such as
 1. **One TCP connection:** HTTP/2 uses one connection which is long lasting. This connection is shared by multiple requests and responses.
-2. **Server Push:** HTTP/2 uses something called server push which means that it can push multiple messages for one request from the client. The client doesn't need to ask for data again and again, the server sends it automatically when it is ready. This leads to a reduction in the number of requests.
+2. **Server Push:** HTTP/2 uses something called server push which means that it can push multiple messages for one request from the client. The client doesn't need to ask for data again and again, the server sends it automane our Unix Domain Socket path
+    std::string server_address("unix:///tmp/sysmanager_grpc.sock");
+
+    SystemManagerServiceImpl service;
+    grpc::ServerBuilder builder;
+
+    // Tell gRPC to listen on our UDS without any encryption
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+
+    // Register our service logic
+    builder.RegisterService(&service);
+
+    // Register our server thread
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    std::cout << "gRPC Server Listening on " << server_address << std::endl;
+
+    // Block until the server shuts down
+    server->Wait();
+}tically when it is ready. This leads to a reduction in the number of requests.
 3. **Multiplexing:** HTTP/2 uses multiplexing which means that the server and client can push multiple messages in parallel over the same TCP connection.
 4. **Header Compression:** The headers and data both are compressed to binary format which leads to a reduction in payload. This is also why protocol buffers are a great match for HTTP/2.
 5. **Security:** Most implementations (like modern browsers) only support HTTP/2 over TLS making the communication secure.
@@ -111,7 +131,25 @@ Consider that we have a `Greeter` service that receives a request and sends a gr
 Note: The Network here, can be replaced with Unix DOmain Sockets if being implemented for internal machine communication.
 
 ## The Asynchronous Nature of gRPC
-gRPC operates on an asynchronous model, leveraging this approach for efficient communication between clients and servers. Understanding this asynchronous nature is crucial in comprehending how gRPC excels in handling concurrent requests without blocking the main thread.
+gRPC operates on an asynchronous model, leveraging this appne our Unix Domain Socket path
+    std::string server_address("unix:///tmp/sysmanager_grpc.sock");
+
+    SystemManagerServiceImpl service;
+    grpc::ServerBuilder builder;
+
+    // Tell gRPC to listen on our UDS without any encryption
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+
+    // Register our service logic
+    builder.RegisterService(&service);
+
+    // Register our server thread
+    std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
+    std::cout << "gRPC Server Listening on " << server_address << std::endl;
+
+    // Block until the server shuts down
+    server->Wait();
+}roach for efficient communication between clients and servers. Understanding this asynchronous nature is crucial in comprehending how gRPC excels in handling concurrent requests without blocking the main thread.
 
 ### Asynchronous servers
 In gRPC, the server operates asynchronously, meaning it doesn’t block while waiting for requests. Instead, it uses non-blocking I/O operations, allowing it to handle multiple requests simultaneously. This asynchronous nature is fundamental; it enables the server to handle a large number of incoming requests concurrently, without waiting for each request to complete before processing the next one.
@@ -195,3 +233,13 @@ gRPC’s architecture is designed to be modular and extensible, allowing develop
 - You can provide multiple server interceptors and thir orders matter, for example you are installing two client interceptors for caching and logging, you must place the logging intercept first and then caching interceptor, because if flipped, that would mean you are focusing more on communication and during an operation if a crash occurs, it would not reach the logging interceptor first and you may loose the crash being logged.
 
 - Deadline/Timeout [11:07]
+
+
+## Setting up
+
+### Linux
+
+Install all dependencies:
+```bash
+sudo apt install cmake build-essential autoconf libtool pkg-config libgrpc++-dev protobuf-compiler-grpc
+```
