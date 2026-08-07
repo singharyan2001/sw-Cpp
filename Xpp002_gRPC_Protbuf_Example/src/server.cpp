@@ -111,7 +111,7 @@ class SystemManagerServiceImpl final : public sysmanager::SystemManager::Service
         // The Read() loop blocks until the client sends data or closes the stream
         while(reader->Read(&chunk)){
             total_bytes += chunk.data_payload().length();
-            std::cout << " -> Received chunk " << chunk.chunk_index() << " (" << chunk.data_payload().length() << " bytes" << std::endl;
+            std::cout << " -> Received chunk index: " << chunk.chunk_index() << "| Payload length: " << chunk.data_payload().length() << " bytes" << std::endl;
         }
 
         // Reply once at the very end

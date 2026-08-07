@@ -4,6 +4,11 @@ syntax = "proto3";
 // Create a namespace for generated C++ classes
 package sysmanager;
 
+// REQUIRED FOR GO GENERATION:
+// This tells the Go plugin what the package name should be in the generated .pb.go files.
+// Using "./sysmanager" means "put it in a package named sysmanager relative to the output dir".
+option go_package = "./sysmanager";
+
 // ================================================
 // ENUMS
 // ================================================
