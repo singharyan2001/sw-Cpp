@@ -12,7 +12,7 @@ import (
 
 	// This import path assumes you initialize your Go module as "dock_core"
 	// in the root of your project directory.
-	pb "dock_core/build/generated/go"
+	pb "dock_core/sysmanager"
 )
 
 func testUnary(client pb.SystemManagerClient) {

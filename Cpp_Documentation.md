@@ -6049,3 +6049,80 @@ If you capture a local variable by reference `[&]`, and you pass that lambda to 
 If the function ends, the local variable is destroyed, but the background thread still has a lambda pointing to that dead memory address. When the timer fires, the lambda will execute and instantly crash your system (Undefined Behavior).
 
 ---
+# Phase 5: Concurrency in C++
+
+## Threads in C++
+
+### Overview
+#### What it is:
+Introduced in C++11, `std::thread` is a standard library class that represents a single thread of execution. It is a C++ wrapper around the underlying operating system's threading API (such as POSIX threads, or pthreads, on Linux). It takes a callable object (a function pointer, lambda, or functor) and executes it concurrently alongside the thread that spawned it.
+
+#### Why we need it?
+To achieve asynchronous, non-blocking execution. In a single-threaded architecture, if you call a `recv()` function to wait for an incoming network packet, the entire program halts until that packet arrives. By spinning up a worker thread, the main thread can continue executing time-critical control loops while the background thread waits for I/O.
+
+#### Use Cases:
+1. **Asynchronous I/O:** Having a dedicated thread in your runtime loop that blocks on a UART or socket `read()` to ingest incoming telemetry, while the main thread manages the monitoing operations.
+2. **Heavy Computation:** Offloading a complex math algorithm (like image processing or pathfinding) to a separate CPU core on a Raspberry Pi 5 so it doesn't jitter the main state machine.
+3. **Periodic Background Tasks:** A watchdog or telemetry-broadcaster thread that wakes up every 100ms, sends a heartbeat, and goes back to sleep.
+
+#### Memory & Lifecycle (The Join/Detach Trap):
+- **Copying is FORBIDDEN:** A thread manages a unique OS-level resource. You cannot copy a `std::thread` (threadA = threadB is a compile error). You can only move ownership using `std::move()`, exactly like a `std::unique_ptr`.
+- **The Golden Rule of Destruction:** When a `std::thread` object goes out of scope, you MUST explicitly tell the OS what to do with the execution context before the destructor runs. If you don't, the C++ runtime will call `std::terminate()` and instantly crash your program. You have two choices:
+  - `thread.join():` The main thread stops and waits for the worker thread to finish executing.
+  - `thread.detach():` The worker thread is severed from the C++ object and left to run in the background independently (often dangerous in firmware, as you lose control over its lifecycle).
+- C++20 Solution (`std::jthread`): C++20 introduced `std::jthread` (Joining Thread), which applies strict RAII. If a `std::jthread` goes out of scope, its destructor automatically calls `.join()` for you, preventing accidental crashes.
+
+#### Performance Overhead
+Unlike standard classes or smart pointers, OS threads have massive overhead compared to simple function calls:
+1. **Stack Allocation:** Every time you create a thread, the OS allocates a completely new chunk of memory for that thread's call stack (often 2MB to 8MB by default on Linux).
+2. **Creation Time:** Spawning a thread requires a system call to the OS kernel, which takes thousands of CPU cycles. Threads should be created once at startup, not continuously created and destroyed inside a loop.
+3. **Context Switching:** If you have more threads than physical CPU cores, the OS kernel must rapidly pause and resume threads to share the CPU. This context switching causes CPU cache misses and disrupts the deterministic timing required for embedded systems.
+4. **The Big Catch:** Once you have two threads running concurrently, if they both try to read/write the same shared variable at the same time, you get a Race Condition (silent memory corruption). This forces you to use synchronization primitives.
+
+### Example
+
+```cpp
+#include <iostream>
+#include <thread>
+
+static bool s_finished = false;
+
+void DoWork(){
+    using namespace std::literals::chrono_literals;
+    std::cout << "Started thread id=" << std::this_thread::get_id() << std::endl;
+    while(!s_finished){
+        std::cout << "Working...\n";
+        std::this_thread::sleep_for(1s);
+    }
+}
+
+int main(){
+    std::cout << "========== Threads in CPP ==========\n";
+    
+    std::thread worker(DoWork);
+
+    std::cin.get();
+    s_finished = true;
+
+    worker.join();
+
+    std::cout << "Finished...\n";
+
+    std::cin.get();
+}
+```
+```text
+========== Threads in CPP ==========
+Started thread id=128489548150464
+Working...
+Working...
+Working...
+Working...
+Working...
+Working...
+Working...
+Working...
+Working...
+
+Finished...
+```

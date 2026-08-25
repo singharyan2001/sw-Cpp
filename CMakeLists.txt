@@ -41,6 +41,7 @@ add_subdirectory(Cpp033_lvalues_rvalues)
 add_subdirectory(Cpp034_move_semantics)
 add_subdirectory(Cpp035_function_pointers)
 add_subdirectory(Cpp036_lambdas)
+add_subdirectory(Cpp037_threads)
 
 add_subdirectory(Mini-Projects/MP001_ring_buffer)
 add_subdirectory(Mini-Projects/MP002_datalogger)

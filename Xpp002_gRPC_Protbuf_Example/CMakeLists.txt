@@ -52,13 +52,9 @@ add_custom_command(
         --plugin=protoc-gen-grpc_python=${GRPC_PYTHON_PLUGIN}
 
         # 3. Go Outputs (Go plugins are usually found automatically if on path)
-        --go_out=${PROTO_GEN_DIR_GO}
-        --go_opt=paths=source_relative
-        --plugin=protoc-gen-go=${GRPC_GO_PLUGIN}
-
-        --go-grpc_out=${PROTO_GEN_DIR_GO}
-        --go-grpc_opt=paths=source_relative
-        --plugin=protoc-gen-go=${GRPC_GO_PLUGIN}
+        --python_out=${PROTO_GEN_DIR_PY}
+        --grpc_python_out=${PROTO_GEN_DIR_PY}
+        --plugin=protoc-gen-grpc_python=${GRPC_PYTHON_PLUGIN}
 
         # Input Definitions
         -I ${PROTO_DIR}
