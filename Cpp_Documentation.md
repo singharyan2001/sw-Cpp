@@ -6126,3 +6126,25 @@ Working...
 
 Finished...
 ```
+
+## Timing in C++
+
+
+## Maps in C++
+
+### Quick Notes
+- Maps are data structures that allow you to associate a key with a value.
+- Vectors use an integer indexing system (ascending indexing 0,1,2,3,...X) for every element we push into that vector gets an ID which is its index inside that data structure.
+- Explained the advantages and limitations of the Vector integer indexing system, and explained use case of Maps based data structure i.e. access respective data if you have the key, which makes it much better option to use for this application, rather than a vector.
+- Two different Map types in C++ i.e. Map (map) and Unordered Map (unmap).
+- Unordered map is a hash table, therefore it uses a hash function to hash your key and it can use that generated index to figure out which bucket your values lies in.
+- Unordered maps are faster or same speed than (ordered) maps.
+- Implemented an example covering vectors, man and unmap based implementation of the same example.
+- Discussed about hash, and implemented a custom hash function to use a custom type with map and unmap.
+- Discussed the `[]` operator which is used with map and umap
+- Discussed about `.at()` function/method.
+- Discussed on how to check if a key exists in a map using `.find()` method.
+- Discussed on how to iterate through a map using for-loop and `auto&` and so on wrt c++14 and c++17
+- Discussed on how to remove entries from maps via `.erase()` method
+- Discussed on writing a less-than operator for custom types when used with maps
+- Discussed about performance and which map to use
