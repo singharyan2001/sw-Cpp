@@ -6173,6 +6173,15 @@ Refer to Cpp040_mutex/ for hands-on implementation trial.
 ## Condition Variable in Multi-Threading
 
 ### Notes
+- A std::condition_variable is essentially a thread-safe doorbell.
+- Use Case: you often have a thread (like your txThread) that needs to wait for something to happen (like a command arriving from the application).
+  - Without a condition variable, you have two bad options:
+    - Polling (100% CPU): A while(queue.empty()) loop that instantly burns an entire CPU core checking over and over.
+    - Sleeping (Latency): while(queue.empty()) { sleep(10ms); }. This saves CPU, but if a command arrives at 1ms, it sits there waiting for 9ms until the thread wakes up, introducing random latency.
+  - A `std::condition_variable` puts the thread into a 0% CPU deep sleep until the OS wakes it up the exact microsecond a command is ready.
+- The Two Rules of Condition Variables:
+  - It MUST use a std::unique_lock. When the thread goes to sleep, it must release the mutex so the other thread can push data. When it wakes up, it must re-acquire the mutex. unique_lock handles this unlock/relock cycle automatically.
+  - Beware of "Spurious Wakeups". The Linux OS will sometimes randomly wake sleeping threads up just to check on them. If your thread wakes up, assumes data is ready, and tries to pop an empty queue, it will crash. You must provide a "condition" (a lambda function) to check if the wakeup was real.
 
 
 ### Hands-On Trials
@@ -6182,6 +6191,112 @@ Refer to Cpp041_cond_var/ for hands-on implementation trial.
 
 
 ## Timing in C++
+#### Quick Notes
+- X
+
+#### Personal Notes
+- In C++, we use the chrono standard library for time, such as measure time taken for a task to perform from start to end, generate timestamp and so on.
+- In the Chrono Library, there are three core components:
+  - Duration: which measures a span of time, for e.g. `std::chrono::seconds(5)`
+  - Time Point: which measures a specific instant in time, for e.g. `clock::now()`
+  - Clock: which measures the source of time, for e.g. `steady_clock`, `system_clock` and so on.
+- Which Clock to use:
+  - `std::chrono::steady_clock`: Always use this for measuring elapsed time like a stopwatch. It is monotonic, meaning it can never go backwards.
+  - `std::chrono::system_clock`: Use this for "Wall Clock" time like date and time or timestamps. It syncs with the system time and can jump forward/backwards.
+  - `std::chrono::high_resoultion_clock`: Usually just an alias for one of the above. Stick to `steady_clock` for robustness.
+- Example: Measuring Execution TIme (Stopwatch)
+  - This is a common use case: E.g. checks how long a function takes to run. Therefore use `steady_clock`
+    ```cpp
+    #include <iostream>
+    #include <chrono>
+    #include <thread>
+
+    int main() {
+        // 1. Start the timer
+        auto start = std::chrono::steady_clock::now();
+
+        // ... Do some work (simulated here by sleeping) ...
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        // 2. Stop the timer
+        auto end = std::chrono::steady_clock::now();
+
+        // 3. Calculate duration
+        // You must cast it to the unit you want (e.g., milliseconds, microseconds)
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+        std::cout << "Time elapsed: " << duration.count() << " ms" << std::endl;
+
+        return 0;
+    }
+    ```
+- Example: Getting current date/time
+  - Use `system_clock` when you need a human-readable timestamp.
+    ```cpp
+    #include <iostream>
+    #include <chrono>
+    #include <ctime>   // For std::time_t
+
+    int main() {
+        // 1. Get current time point
+        auto now = std::chrono::system_clock::now();
+
+        // 2. Convert to time_t (C-style time) to print it easily
+        std::time_t currentTime = std::chrono::system_clock::to_time_t(now);
+
+        // 3. Print
+        // ctime converts time_t to a string like "Wed Dec 31 17:00:00 2025\n"
+        std::cout << "Current time: " << std::ctime(&currentTime); 
+
+        return 0;
+    }
+    ```
+- Cheat Sheet: Duration Conversions
+  - C++ allows you to do math with time units directly
+    ```cpp
+    using namespace std::chrono;
+
+    // Literals (C++14 and later)
+    auto time1 = 10s;        // 10 seconds
+    auto time2 = 150ms;      // 150 milliseconds
+    auto time3 = 1h + 30min; // 1 hour 30 mins
+
+    // Precision Math
+    // If you subtract two time_points, you get a duration
+    duration<double> exact_sec = steady_clock::now() - start;
+    std::cout << exact_sec.count(); // Returns fractional seconds (e.g., 0.50023)
+    ```
+- Above Notes created from this reference Link as source: https://dilipkumar.medium.com/c-chrono-for-time-71b73d9e33f6
+
+- There is also something called chrono literals through which we can assign units to numbers, for e.g.
+```cpp
+using namespace std::chrono_literals;
+constexpr auto d1 = 500ms;  // std::chrono::milliseconds
+constexpr auto d2 - 2s;     // std::chrono::seconds
+static_assert(d1 < d2);
+```
+
+- New Resource: https://www.sandordargo.com/blog/2025/11/19/clocks-part-1-intro-to-chrono
+- Clocks are the source of time point. At their core, they need two things:
+  - A starting point, a.k.a an epoch
+  - A tick rate
+- A typical Example would be the Unix epoch.
+- For a type to qualify as a clock, it must:
+  - Have a nested `duration` type
+  - Have a nested `time_point` type
+  - Provide a static `now()` function that returns a `time_point`
+  - Have a constant `is_steady` boolean
+  - Define `rep` and `period` types for the underlying representation and tick frequency (just like a duration does)
+- C++ 11 introduced three standard clocks:
+  - `system_clock`
+  - `steady_clock`
+  - `high_resolution_clock`
+- C++ 20 bough us 4 more:
+  - `utc_clock`
+  - `tai_clock`
+  - `gps_clock`
+  - `file_clock`
+- 
 
 
 ## Maps in C++
